@@ -1,6 +1,6 @@
 /** Servidor local: o mesmo Worker com banco em memória e dados de demonstração.  Uso: npm run dev  →  http://localhost:8787 */
 import http from "node:http";
-import { handle } from "../src/worker.js";
+import { handle, runCron } from "../src/worker.js";
 import { localEnv } from "./local-env.mjs";
 
 const PORT = Number(process.env.PORT || 8787);
@@ -11,6 +11,8 @@ if (process.env.DEV_ACCESS_TOKEN) {
   env._db.prepare("INSERT INTO access_invites (token_hash, wedding_id, role, expires_at) VALUES (?, 'w_petalucas', 'owner', ?)").run(await sha256(process.env.DEV_ACCESS_TOKEN), new Date(Date.now() + 864e5).toISOString());
 }
 http.createServer(async (req, res) => {
+  // só local: roda a rotina diária na hora (GET /__cron?agora=2027-06-01)
+  if (req.url.startsWith("/__cron")) { const q = new URL(req.url, "http://x").searchParams.get("agora"); await runCron(env, q ? new Date(q) : new Date()); res.end("cron ok"); return; }
   const chunks = []; for await (const c of req) chunks.push(c);
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) if (typeof v === "string") headers.set(k, v);
   headers.set("CF-Connecting-IP", req.socket.remoteAddress || "local");

@@ -1,5 +1,6 @@
 /** Convite pessoal: /i/:token  — envelope, mensagem, eventos da família e RSVP por pessoa e por evento. */
 import { $, $$, esc, longDate, time, api, mapsLink, reduceMotion } from "./ui.js";
+import { INVITE_MODS } from "./invite-mods/index.js";
 
 const token = location.pathname.split("/")[2];
 const app = $("#app");
@@ -100,6 +101,7 @@ function renderInvite(scrollTo) {
       <div class="done" id="done" hidden tabindex="-1"><p class="label">Recebido</p><h2 id="doneT"></h2><p class="muted">Você pode voltar a este link para mudar as respostas até o prazo.</p><button class="link" type="button" id="edit">Ver ou alterar respostas</button></div>
     </section>
 
+    <div id="invMods"></div>
     <footer class="wrap inv-foot rv">
       <a class="btn ghost" href="/c/${esc(w.slug)}">Ver o site do casamento</a>
       <a class="btn ghost" id="share" href="#" target="_blank" rel="noopener">Enviar para quem está no convite</a>
@@ -110,6 +112,7 @@ function renderInvite(scrollTo) {
   $("#share").href = "https://wa.me/?text=" + encodeURIComponent(`Nosso convite para o casamento de ${w.names}. Este link é só da nossa família: ${location.href}`);
   $("#form").addEventListener("submit", submit);
   $("#edit").addEventListener("click", () => { $("#done").hidden = true; $("#form").hidden = false; });
+  for (const l of INVITE_MODS) l().then(m => m.init?.({ data, mods: data.mods || {}, root: $("#invMods"), token, api, esc })).catch(e => console.error(e));
   import("./ui.js").then(m => m.reveal());
   if (scrollTo) $(scrollTo)?.scrollIntoView();
 }

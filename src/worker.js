@@ -36,6 +36,7 @@
  *   POST /api/admin/presentes/:id/check       marca/desmarca "conferido no extrato"   ·   DELETE /api/admin/presentes/:id   apaga
  *   GET  /api/admin/export                    exporta todos os dados do casamento (LGPD)
  */
+import { MODS } from "./mods/index.js";
 import { json, err, HttpError, fail, str, int, oneOf, isoDate, body, randomToken, uid, sha256, hashPassword, safeEqual, rateLimit, clientIp, audit, parseJson } from "./lib.js";
 
 const SESSION_DAYS = 14;
@@ -62,7 +63,14 @@ const SECURITY_HEADERS = {
 };
 
 /* ---------------- roteamento ---------------- */
-export default { fetch: (req, env) => handle(req, env) };
+export default {
+  fetch: (req, env) => handle(req, env),
+  /** Rotina diária (wrangler.jsonc → triggers.crons): cada módulo faz a sua parte (ex.: apagar dados vencidos, abrir cápsulas). */
+  scheduled: (ev, env, ctx) => ctx.waitUntil(runCron(env, new Date(ev.scheduledTime || Date.now()))),
+};
+export async function runCron(env, now = new Date()) {
+  for (const mod of MODS) if (mod.cron) { try { await mod.cron(env, now); } catch (e) { console.error("cron", mod.name, e); } }
+}
 
 export async function handle(req, env) {
   const url = new URL(req.url);
@@ -75,8 +83,10 @@ export async function handle(req, env) {
     else if (/^\/c\/[a-z0-9-]{3,60}\/?$/.test(p)) asset = "/casal.html";
     else if (/^\/i\/[A-Za-z0-9_-]{16,64}\/?$/.test(p)) asset = "/convite.html";
     else if (p === "/painel" || p === "/painel/") asset = "/painel/index.html";
+    let priv = false;
+    if (!asset) for (const mod of MODS) for (const [re, file, isPrivate] of mod.pages || []) if (!asset && re.test(p)) { asset = file; priv = !!isPrivate; }
     const res = await env.ASSETS.fetch(new Request(new URL(asset || p, url.origin), req));
-    return withSecurity(res, asset === "/convite.html");
+    return withSecurity(res, asset === "/convite.html" || priv);
   } catch (e) {
     if (e instanceof HttpError) return err(e.status, e.message, e.code);
     console.error(e);
@@ -102,6 +112,9 @@ async function api(req, env, url) {
     if (m === "GET" && !r[2]) return inviteData(req, env, r[1]);
     if (m === "POST" && r[2]) { sameOrigin(req, url); return inviteRsvp(req, env, r[1]); }
   }
+  const ctx = { req, env, url, p, m, session: () => session(req, env), sameOrigin: () => sameOrigin(req, url) };
+  for (const mod of MODS) if (mod.public) { const res = await mod.public(ctx); if (res) return res; }
+  for (const mod of MODS) if (mod.root) { const res = await mod.root(ctx); if (res) return res; }
   // autenticação
   if (p === "/api/auth/login" && m === "POST") { sameOrigin(req, url); return login(req, env, url); }
   if (p === "/api/auth/logout" && m === "POST") { sameOrigin(req, url); return logout(req, env); }
@@ -109,7 +122,7 @@ async function api(req, env, url) {
     if (m === "GET") return setupInfo(req, env, r[1]);
     if (m === "POST") { sameOrigin(req, url); return setupAccess(req, env, url, r[1]); }
   }
-  if (p === "/api/me" && m === "GET") { const s = await session(req, env); return json({ user: { name: s.user_name, email: s.email }, wedding: { id: s.wedding_id, names: s.names, slug: s.slug, is_demo: !!s.is_demo }, role: s.role }); }
+  if (p === "/api/me" && m === "GET") { const s = await session(req, env); return json({ user: { name: s.user_name, email: s.email }, wedding: { id: s.wedding_id, names: s.names, slug: s.slug, is_demo: !!s.is_demo, theme: s.theme || "", universe: s.universe }, role: s.role }); }
 
   // área dos noivos
   if (p.startsWith("/api/admin/")) {
@@ -152,8 +165,17 @@ async function api(req, env, url) {
       if (m === "POST" && r[2]) { await env.DB.prepare("UPDATE gift_notices SET checked = ? WHERE id = ? AND wedding_id = ?").bind(own.checked ? 0 : 1, r[1], W).run(); return json({ ok: true, checked: !own.checked }); }
       if (m === "DELETE" && !r[2]) { await env.DB.prepare("DELETE FROM gift_notices WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); await audit(env, W, actor, "gift_notice.delete", r[1]); return json({ ok: true }); }
     }
+    const actx = { ...ctx, s, W, actor };
+    for (const mod of MODS) if (mod.admin) { const res = await mod.admin(actx); if (res) return res; }
   }
   return err(404, "Não encontrado", "not_found");
+}
+
+/** Dados extras que cada módulo publica no site, no convite ou na visão geral (ficam em data.mods[nome]). */
+async function modsData(kind, ...args) {
+  const out = {};
+  for (const mod of MODS) if (mod[kind]) { const v = await mod[kind](...args); if (v !== undefined && v !== null) out[mod.name] = v; }
+  return out;
 }
 
 /** Proteção CSRF: escrita só a partir do próprio site. */
@@ -171,7 +193,7 @@ function readCookie(req, name) {
 async function session(req, env) {
   const raw = readCookie(req, COOKIE) || readCookie(req, "sess");
   if (!raw || raw.length > 100) fail(401, "Entre para continuar", "unauthenticated");
-  const s = await env.DB.prepare(`SELECT s.user_id, s.wedding_id, s.expires_at, u.name AS user_name, u.email, m.role, w.names, w.slug, w.is_demo
+  const s = await env.DB.prepare(`SELECT s.user_id, s.wedding_id, s.expires_at, u.name AS user_name, u.email, m.role, w.names, w.slug, w.is_demo, w.theme, w.universe
     FROM sessions s JOIN users u ON u.id = s.user_id JOIN memberships m ON m.user_id = s.user_id AND m.wedding_id = s.wedding_id
     JOIN weddings w ON w.id = s.wedding_id WHERE s.id_hash = ?`).bind(await sha256(raw)).first();
   if (!s || s.expires_at < new Date().toISOString()) fail(401, "Sessão expirada. Entre de novo.", "unauthenticated");
@@ -250,7 +272,7 @@ async function siteData(env, slug) {
   if (!w) fail(404, "Site não encontrado", "not_found");
   const ev = await env.DB.prepare("SELECT name, starts_at, venue, address, dress_code, notes FROM events WHERE wedding_id = ? AND is_public = 1 ORDER BY sort, starts_at").bind(w.id).all();
   const msgs = w.guestbook ? (await env.DB.prepare("SELECT author, message, created_at FROM guestbook WHERE wedding_id = ? AND status = 'approved' ORDER BY created_at DESC LIMIT 60").bind(w.id).all()).results : [];
-  return json({ wedding: publicWedding(w), events: ev.results, messages: msgs }, 200, { "Cache-Control": "public, max-age=60" });
+  return json({ wedding: publicWedding(w), events: ev.results, messages: msgs, mods: await modsData("site", env, w) }, 200, { "Cache-Control": "public, max-age=60" });
 }
 async function postMessage(req, env, slug) {
   const w = await env.DB.prepare("SELECT id, guestbook FROM weddings WHERE slug = ?").bind(slug).first();
@@ -304,6 +326,7 @@ async function inviteData(req, env, token) {
     household: { name: h.name, greeting: h.greeting || h.name, message: h.message, max_guests: h.max_guests, note: h.note_to_couple, responded_at: h.responded_at },
     events, guests: guests.map(g => ({ ...g, is_child: !!g.is_child })),
     responses: rs, open: !deadlinePassed(w.rsvp_deadline),
+    mods: await modsData("invite", env, w, h),
   });
 }
 const deadlinePassed = d => new Date().toISOString().slice(0, 10) > d;
@@ -349,7 +372,7 @@ async function overview(env, W) {
   const b = await budgetTotals(env, W);
   const gf = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(cents), 0) AS cents, COALESCE(SUM(checked = 0), 0) AS unchecked FROM gift_notices WHERE wedding_id = ?").bind(W).first();
   return json({ wedding: { ...w, is_demo: !!w.is_demo }, events: events.map(e => ({ ...e, pending: e.invited - e.yes - e.no })),
-    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b, gifts: gf });
+    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b, gifts: gf, mods: await modsData("overview", env, W) });
 }
 async function guestList(env, W) {
   const hs = (await env.DB.prepare("SELECT id, name, greeting, max_guests, revoked, token_hash IS NOT NULL AS has_link, token_at, responded_at, note_to_couple FROM households WHERE wedding_id = ? ORDER BY created_at").bind(W).all()).results;
@@ -535,6 +558,7 @@ async function exportData(env, W, actor) {
     guestbook: await q("SELECT * FROM guestbook WHERE wedding_id = ?"),
     gift_notices: await q("SELECT * FROM gift_notices WHERE wedding_id = ?"),
   };
+  Object.assign(data, await modsData("exportData", env, W));
   await audit(env, W, actor, "export");
   return json(data, 200, { "Content-Disposition": `attachment; filename="casamento-${data.wedding.slug}.json"` });
 }

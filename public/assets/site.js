@@ -3,12 +3,15 @@ import { $, $$, esc, longDate, time, countdown, reveal, api, mapsLink, money } f
 import { icon } from "./icons.js";
 import { brcode } from "./pix.js";
 import { qrcode } from "./vendor/qrcode.js";
+import { SITE_MODS } from "./site-mods/index.js";
 
 const slug = location.pathname.split("/")[2];
 const app = $("#app");
 
 try {
-  const { wedding: w, events, messages } = await api(`/api/site/${slug}`);
+  const { wedding: w, events, messages, mods } = await api(`/api/site/${slug}`);
+  // módulos do site (seções extras): carregados antes de desenhar
+  const loaded = (await Promise.all(SITE_MODS.map(l => l().catch(e => { console.error(e); return null; })))).filter(Boolean);
   // pré-visualização de universos só em casamentos de demonstração
   const pick = new URLSearchParams(location.search).get("universo");
   const universe = w.is_demo && ["timeless", "editorial", "dreamscape"].includes(pick) ? pick : w.universe;
@@ -19,16 +22,18 @@ try {
     await new Promise(r => { l.onload = l.onerror = r; });
   }
   document.title = `${w.names} · ${longDate(w.date)}`;
-  render(w, events, messages || [], universe);
+  render(w, events, messages || [], universe, loaded, mods || {});
 } catch (e) {
   app.innerHTML = `<main class="empty wrap"><p class="label">Site não encontrado</p><h1>Não achamos este casamento.</h1><p class="muted">Confira o endereço com os noivos.</p></main>`;
 } finally { app.removeAttribute("aria-busy"); }
 
-function render(w, events, messages, universe) {
+function render(w, events, messages, universe, loaded = [], mods = {}) {
   const [a, b] = w.names.split("&").map(s => s.trim());
   let n = 0;
   const nav = [];
-  const sec = (id, label, title, inner, cls = "") => {
+  // seções são montadas como objetos; módulos podem inserir as suas antes de uma seção existente (before: id)
+  const sec = (id, label, title, inner, cls = "") => ({ id, label, title, inner, cls });
+  const draw = ({ id, label, title, inner, cls = "" }) => {
     nav.push([id, label]);
     return `<section class="sec ${cls}" id="${id}"><div class="wrap"><header class="sh rv"><p class="label"><span class="n">${String(++n).padStart(2, "0")}</span>${label}</p><h2>${title}</h2></header>${inner}</div></section>`;
   };
@@ -76,6 +81,11 @@ function render(w, events, messages, universe) {
   if (w.faq.length) html.push(sec("duvidas", "Dúvidas", "Bom <em>saber</em>",
     `<div class="faq rv">${w.faq.map(f => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join("")}</div>`));
 
+  for (const m of loaded) for (const x of m.sections?.({ w, data: mods[m.name], esc, icon, money, longDate }) || []) {
+    const at = x.before ? html.findIndex(h => h.id === x.before) : -1;
+    html.splice(at < 0 ? html.length : at, 0, x);
+  }
+  const sections = html.map(draw);
   const logo = w.theme ? `<img class="hero-logo" src="/assets/themes/${esc(w.theme)}/logo.png" alt="${esc(w.names)}" width="742" height="338">` : "";
   app.innerHTML = `
   <header class="top"><div class="wrap"><a class="mono" href="#topo">${w.theme ? esc(w.names) : `${esc(a?.[0] || "")}<i>&amp;</i>${esc(b?.[0] || "")}`}</a>
@@ -92,7 +102,7 @@ function render(w, events, messages, universe) {
         ${w.welcome ? `<p class="welcome">${esc(w.welcome)}</p>` : ""}
       </div>
     </section>
-    ${html.join("")}
+    ${sections.join("")}
   </main>
   <footer class="foot"><div class="wrap"><p>${esc(w.names)} · ${esc(longDate(w.date))}</p><p class="muted">Site feito com Universo · Gueta Studio</p></div></footer>
   ${w.pix_key ? `<dialog class="pixdlg" id="pixDlg" aria-labelledby="pixT"><div class="dlg-in">
@@ -132,6 +142,7 @@ function render(w, events, messages, universe) {
   const onScroll = () => document.body.classList.toggle("scrolled", scrollY > innerHeight * .6);
   addEventListener("scroll", onScroll, { passive: true }); onScroll();
   requestAnimationFrame(() => document.body.classList.add("ready"));
+  for (const m of loaded) try { m.init?.({ w, data: mods[m.name], slug, api, $, $$, esc }); } catch (e) { console.error(e); }
   reveal();
   if (w.theme) import(`/assets/themes/${w.theme}/theme.js`).then(m => m.site?.()).catch(() => {}); // animações da identidade (opcional)
 }

@@ -8,7 +8,9 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..")
 
 export async function localEnv({ seed = true } = {}) {
   const db = new DatabaseSync(":memory:");
-  db.exec(fs.readFileSync(path.join(ROOT, "schema.sql"), "utf8"));
+  // aplica as migrações em ordem, como o deploy faz (cada módulo traz as suas)
+  const dir = path.join(ROOT, "migrations");
+  for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort()) db.exec(fs.readFileSync(path.join(dir, f), "utf8"));
   if (seed) db.exec(await seedSql());
   const stmt = (sql) => {
     let args = [];
