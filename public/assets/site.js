@@ -35,6 +35,9 @@ function render(w, events, messages, universe) {
   if (w.story.length) html.push(sec("historia", "Nossa história", "Como chegamos <em>até aqui</em>",
     `<ol class="story${w.story.some(s => s.image) ? "" : " no-img"}">${w.story.map(s => `<li class="chapter rv">${s.image ? `<figure data-bg="${esc(s.image)}"></figure>` : ""}<div class="txt"><span class="yr num">${esc(s.year)}</span><h3>${esc(s.title)}</h3><p>${esc(s.text)}</p></div></li>`).join("")}</ol>`));
 
+  if (w.quiz.length) html.push(sec("quiz", "Quiz", "Quanto você conhece <em>o casal?</em>",
+    `<div class="quiz rv" id="quizBox" aria-live="polite"></div>`));
+
   const ev = events.map(e => `<article class="event rv">
       <p class="when"><span class="num">${esc(time(e.starts_at))}</span><span>${esc(longDate(e.starts_at))}</span></p>
       <h3>${esc(e.name)}</h3><p class="venue">${esc(e.venue)}</p>${e.address ? `<p class="addr">${esc(e.address)}</p>` : ""}
@@ -63,7 +66,7 @@ function render(w, events, messages, universe) {
       <ul class="gb-list" aria-live="polite">${messages.map(m => `<li class="gb-item rv"><p>${esc(m.message)}</p><span>${esc(m.author)}</span></li>`).join("") || `<li class="gb-empty muted">Seja a primeira pessoa a deixar um recado.</li>`}</ul></div>`));
 
   if (w.gifts.length || w.pix_key || w.gift_url) html.push(sec("presentes", "Presentes", "Sua presença é <em>o melhor presente</em>",
-    `${w.gifts.length ? `<ul class="gifts">${w.gifts.map(g => `<li class="gift rv"><h3>${esc(g.title)}</h3><span class="v num">${g.cents ? esc(money(g.cents)) : "Valor livre"}</span></li>`).join("")}</ul>` : ""}
+    `${w.gifts.length ? `<ul class="gifts${w.gifts.some(g => g.icon) ? " rich" : ""}">${w.gifts.map((g, i) => `<li class="gift rv">${g.icon ? `<span class="gico">${icon(g.icon)}</span>` : ""}<div class="gtxt"><h3>${esc(g.title)}</h3>${g.note ? `<p>${esc(g.note)}</p>` : ""}</div><span class="v num">${g.cents ? esc(money(g.cents)) : "Valor livre"}</span>${w.pix_key ? `<button class="btn ghost sm" type="button" data-gift="${i}">Presentear</button>` : ""}</li>`).join("")}</ul>` : ""}
      ${w.gift_url ? `<p class="rv"><a class="btn ghost" href="${esc(w.gift_url)}" target="_blank" rel="noopener">Ver lista de presentes</a></p>` : ""}
      ${w.pix_key ? `<div class="pix rv"><p><span class="label">Pix dos noivos</span> <code>${esc(w.pix_key)}</code></p><button class="btn sm" type="button" id="copyPix">Copiar chave</button></div>` : ""}
      <p class="direct rv">O valor vai direto para a conta dos noivos, sem comissão de site de casamento.</p>`, "alt"));
@@ -90,6 +93,10 @@ function render(w, events, messages, universe) {
     ${html.join("")}
   </main>
   <footer class="foot"><div class="wrap"><p>${esc(w.names)} · ${esc(longDate(w.date))}</p><p class="muted">Site feito com Universo · Gueta Studio</p></div></footer>
+  ${w.pix_key ? `<dialog class="pixdlg" id="pixDlg" aria-labelledby="pixT"><form method="dialog"><p class="label">Presente</p><h3 id="pixT"></h3><p class="pv num" id="pixV"></p>
+    <p class="muted">Copie a chave Pix e faça a transferência pelo app do seu banco.</p>
+    <div class="pixkey"><code>${esc(w.pix_key)}</code><button class="btn sm" type="button" id="pixCopy">Copiar chave</button></div>
+    <p class="direct">O valor vai direto para a conta dos noivos, sem comissão.</p><button class="link" value="close">Fechar</button></form></dialog>` : ""}
   ${w.is_demo ? `<p class="demo" role="note">Casamento fictício de demonstração · universo ${esc(universe)} · <a href="/">conheça o Universo</a></p>` : ""}`;
 
   // imagens de fundo via CSSOM (a política de segurança bloqueia estilos inline)
@@ -104,9 +111,53 @@ function render(w, events, messages, universe) {
       f.innerHTML = `<p class="gb-ok"><b>Recado enviado!</b><br>Ele aparece no mural assim que os noivos aprovarem. Obrigado pelo carinho.</p>`; }
     catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = "Enviar recado"; }
   });
+  // presentes: diálogo com valor e chave Pix
+  const dlg = $("#pixDlg");
+  $$("[data-gift]").forEach(b => b.addEventListener("click", () => {
+    const g = w.gifts[+b.dataset.gift];
+    $("#pixT").textContent = g.title; $("#pixV").textContent = g.cents ? money(g.cents) : "Valor livre";
+    $("#pixCopy").textContent = "Copiar chave"; dlg.showModal();
+  }));
+  $("#pixCopy")?.addEventListener("click", async e => { try { await navigator.clipboard.writeText(w.pix_key); e.target.textContent = "Copiada!"; } catch { e.target.textContent = w.pix_key; } });
+  dlg?.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+  if (w.quiz.length) quiz($("#quizBox"), w);
+
   const onScroll = () => document.body.classList.toggle("scrolled", scrollY > innerHeight * .6);
   addEventListener("scroll", onScroll, { passive: true }); onScroll();
   requestAnimationFrame(() => document.body.classList.add("ready"));
   reveal();
   if (w.theme) import(`/assets/themes/${w.theme}/theme.js`).then(m => m.site?.()).catch(() => {}); // animações da identidade (opcional)
+}
+
+/** Quiz "Quanto você conhece o casal?" — uma pergunta por vez, com a curiosidade depois de cada resposta. */
+function quiz(box, w) {
+  const Q = w.quiz; let i = 0, score = 0;
+  const band = n => n === Q.length ? ["Testemunha oficial dessa história!", "Você sabe tudo. Já pode contar essa história no brinde."]
+    : n >= Q.length - 2 ? ["Quase da família!", "Conhece bem o casal. Na festa, puxa a conversa sobre o Djavan."]
+    : ["Vem com a gente na pista!", "Ainda dá tempo de conhecer melhor: senta perto deles e pede a história completa."];
+  const draw = () => {
+    if (i >= Q.length) {
+      const [t, d] = band(score);
+      const msg = `Fiz ${score}/${Q.length} no quiz de ${w.names}! E você, quanto conhece o casal? ${location.origin}${location.pathname}#quiz`;
+      box.innerHTML = `<div class="qend"><p class="qscore num">${score}<span>/${Q.length}</span></p><h3>${esc(t)}</h3><p>${esc(d)}</p>
+        <div class="qacts"><a class="btn" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Desafiar no WhatsApp</a><button class="btn ghost" type="button" id="qAgain">Jogar de novo</button></div></div>`;
+      $("#qAgain").onclick = () => { i = 0; score = 0; draw(); };
+      return;
+    }
+    const q = Q[i];
+    box.innerHTML = `<div class="qhead"><span class="num">${i + 1} de ${Q.length}</span><span class="qbar"><i></i></span></div>
+      <h3 class="qq">${esc(q.q)}</h3><div class="qopts">${q.options.map((o, k) => `<button class="qopt" type="button" data-k="${k}">${esc(o)}</button>`).join("")}</div><div class="qfact" hidden></div>`;
+    box.querySelector(".qbar i").style.width = (i / Q.length * 100) + "%";
+    box.querySelectorAll(".qopt").forEach(b => b.onclick = () => {
+      const k = +b.dataset.k, right = k === q.answer;
+      if (right) score++;
+      box.querySelectorAll(".qopt").forEach(x => { x.disabled = true; if (+x.dataset.k === q.answer) x.classList.add("right"); });
+      if (!right) b.classList.add("wrong");
+      const f = box.querySelector(".qfact"); f.hidden = false;
+      f.innerHTML = `<p><b>${right ? "Acertou!" : "Quase!"}</b> ${esc(q.fact)}</p><button class="btn sm" type="button">${i + 1 < Q.length ? "Próxima" : "Ver resultado"}</button>`;
+      f.querySelector("button").onclick = () => { i++; draw(); };
+      f.querySelector("button").focus();
+    });
+  };
+  draw();
 }

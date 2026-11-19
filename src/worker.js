@@ -244,7 +244,8 @@ function publicWedding(w) {
     story: parseJson(w.story_json, []), gifts: parseJson(w.gifts_json, []), pix_key: w.pix_key, faq: parseJson(w.faq_json, []),
     rsvp_deadline: w.rsvp_deadline, is_demo: !!w.is_demo, slug: w.slug,
     theme: w.theme || "", venue_name: w.venue_name || "", schedule: parseJson(w.schedule_json, []), dress: parseJson(w.dress_json, []),
-    map_image: w.map_image || "", gift_url: w.gift_url || "", rsvp_note: w.rsvp_note || "", guestbook: !!w.guestbook };
+    map_image: w.map_image || "", gift_url: w.gift_url || "", rsvp_note: w.rsvp_note || "", guestbook: !!w.guestbook,
+    quiz: parseJson(w.quiz_json, []) };
 }
 
 /* ---------------- convite pessoal ---------------- */

@@ -107,6 +107,7 @@ export async function seedSql() {
 
 /* ---------- Pétala & Lucas: casal real, identidade própria (prévia do Gueta Studio) ----------
    Textos, horários e regras copiados do site atual do casal. A família convidada abaixo é um EXEMPLO. */
+const PL_DATA = {"quiz": [{"q": "Como foi o primeiro contato entre os dois?", "options": ["Num show do Djavan", "Uma mensagem no Instagram", "Na mudança da Pétala", "Num samba em Curitiba"], "answer": 1, "fact": "Em 2017, o Lucas mandou uma mensagem despretensiosa para a Pétala no Instagram."}, {"q": "Sobre qual música do Djavan o Lucas perguntou?", "options": ["Oceano", "Flor de Lis", "Pétala", "Se..."], "answer": 2, "fact": "Ele perguntou se ela sabia que “Pétala” era a música mais bonita do Djavan, sem saber que o nome dela tinha vindo justamente dessa música."}, {"q": "Que filme a Pétala chamou o Lucas para assistir?", "options": ["Diário de uma Paixão", "O Diabo Veste Prada", "La La Land", "Mamma Mia!"], "answer": 1, "fact": "O Diabo Veste Prada. Detalhe: ela não tinha o filme em casa."}, {"q": "Como o Lucas entrou na mudança da Pétala, em 2019?", "options": ["Como arquiteto", "Carregando caixas", "Como vizinho", "Como corretor"], "answer": 0, "fact": "Ele ofereceu seus serviços como arquiteto. Desde então, não se desgrudaram."}, {"q": "Em que ano eles se casaram no cartório?", "options": ["2019", "2021", "2022", "2027"], "answer": 2, "fact": "Em 2022. E 2027 é o ano de comemorar com quem eles mais amam."}], "gifts": [{"title": "Uma rodada de pizza", "cents": 15000, "icon": "pizza", "note": "Fatia quente, conversa boa."}, {"title": "Drinks no pôr do sol", "cents": 12000, "icon": "glass", "note": "Um brinde ao amor."}, {"title": "A caixinha de docinhos", "cents": 9000, "icon": "sweet", "note": "A tradição que ninguém pula."}, {"title": "O lanche da madrugada", "cents": 10000, "icon": "snack", "note": "Combustível pra dançar até o fim."}, {"title": "Uma noite de samba", "cents": 20000, "icon": "music", "note": "Para a roda não parar."}, {"title": "Ajuda na lua de mel", "cents": 30000, "icon": "heart", "note": "Para a próxima viagem dos dois."}, {"title": "Do seu jeito", "cents": 0, "icon": "heart", "note": "Qualquer valor, com todo carinho."}]};
 export const PETALUCAS = { token: "exemplo-petala-e-lucas-2027" }; // o acesso ao painel do casal é criado à parte, nunca com senha no repositório
 async function petalucas() {
   const o = [], W = "w_petalucas", T = "/assets/themes/petalucas/";
@@ -134,7 +135,8 @@ async function petalucas() {
       { title: "Pés no chão", text: "Pedimos a gentileza de não usar tênis. O salão tem área externa gramada: saltos finos podem sofrer, e não serão fornecidas sandálias para dança.", icon: "shoe" },
       { title: "Cores livres", text: "Evitem apenas o branco, reservado para a noiva. As madrinhas estarão de verde-oliva, mas não há restrição para essa cor.", icon: "palette" },
     ]),
-    gifts_json: JSON.stringify([]),
+    gifts_json: JSON.stringify(PL_DATA.gifts),
+    quiz_json: JSON.stringify(PL_DATA.quiz),
     gift_url: "",
     faq_json: JSON.stringify([
       { q: "Posso levar acompanhante?", a: "O convite é individual e intransferível: vale para as pessoas com nome no seu convite." },

@@ -170,3 +170,5 @@ CREATE TABLE IF NOT EXISTS access_invites (
   used_by    TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Quiz "Quanto você conhece o casal?" (perguntas só com fatos que o casal publicou)
+ALTER TABLE weddings ADD COLUMN quiz_json TEXT NOT NULL DEFAULT '[]';   -- [{q, options[], answer(index), fact}]

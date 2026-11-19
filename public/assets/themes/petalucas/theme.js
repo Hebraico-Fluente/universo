@@ -51,7 +51,39 @@ function hearts(from) {
   }
 }
 
+/** Easter egg: 5 toques no coração do logo → chuva de pétalas e a música do Djavan. Funciona também com movimento reduzido (sem a chuva). */
+function djavan() {
+  const logo = document.querySelector(".hero-logo");
+  if (!logo) return;
+  logo.setAttribute("role", "button"); logo.setAttribute("tabindex", "0");
+  logo.setAttribute("aria-label", "Pétala & Lucas (toque 5 vezes para uma surpresa)");
+  let taps = [], card;
+  const show = () => {
+    if (!reduce()) petals(document.body, 40, { burst: true });
+    if (!card) {
+      card = document.createElement("div"); card.className = "djavan"; card.setAttribute("role", "dialog"); card.setAttribute("aria-label", "Surpresa");
+      const q = encodeURIComponent("Djavan Pétala");
+      card.innerHTML = `<button class="x" type="button" aria-label="Fechar">×</button><div class="note" aria-hidden="true">🎵</div>
+        <p><b>Você achou!</b>“Pétala” é a música mais bonita do Djavan. Foi com ela que essa história começou.</p>
+        <div class="acts"><a class="btn sm" href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener">Ouvir no Spotify</a><a class="btn ghost sm" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">Ouvir no YouTube</a></div>`;
+      document.body.append(card);
+      card.querySelector(".x").onclick = () => card.classList.remove("show");
+    }
+    requestAnimationFrame(() => card.classList.add("show"));
+  };
+  const tap = () => {
+    const now = Date.now(); taps = taps.filter(t => now - t < 4000); taps.push(now);
+    logo.animate?.([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 220 });
+    if (taps.length >= 5) { taps = []; show(); }
+  };
+  logo.addEventListener("click", tap);
+  logo.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(); } });
+  const foot = document.querySelector(".foot .wrap");
+  if (foot) { const h = document.createElement("p"); h.className = "egg-hint"; h.textContent = "Psiu… tem uma surpresa escondida no coração lá em cima. 💛"; foot.append(h); }
+}
+
 export function site() {
+  djavan();
   if (reduce()) return;
   const hero = document.querySelector(".hero");
   if (hero) petals(hero, innerWidth < 640 ? 10 : 16);
