@@ -123,3 +123,14 @@ fieldset.field legend span{font:600 var(--t-label)/1.2 var(--sans);letter-spacin
   .acts{flex-wrap:wrap}
 }
 @media (max-width:700px){.tbl .acts{display:flex!important;gap:18px}}
+
+/* presentes avisados por Pix */
+.gnote{max-width:62ch;margin:-10px 0 22px}
+.glist{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.gn{display:grid;gap:6px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper)}
+.gn.done{background:color-mix(in srgb,var(--paper-2) 50%,transparent)}
+.gn-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.gn-h b{font:400 20px/1.2 var(--serif)}
+.gn p{margin:0}
+.gn-msg{font-style:italic}
+.gn .row-btns{margin-top:6px;align-items:center}

@@ -23,7 +23,7 @@ export async function seedSql() {
   /* ---------- casamento principal: Helena & Rafael (universo Editorial) ---------- */
   out.push(ins("weddings", {
     id: "w_demo", slug: "helena-e-rafael", names: "Helena & Rafael", date_iso: "2027-10-16T16:30:00-03:00", city: "Curitiba · Paraná",
-    universe: "editorial", hero_image: U("1519741497674-611481863552", 2000), rsvp_deadline: "2027-09-15", is_demo: 1, pix_key: "helena.rafael@exemplo.com",
+    universe: "editorial", hero_image: U("1519741497674-611481863552", 2000), rsvp_deadline: "2027-09-15", is_demo: 1, pix_key: "helena.rafael@exemplo.com", pix_name: "Helena e Rafael", pix_city: "Sao Paulo",
     welcome: "Depois de oito anos, uma mudança de cidade e um cachorro chamado Café, decidimos fazer a festa que a gente sempre imaginou. Queremos você lá.",
     story_json: JSON.stringify([
       { year: "2019", title: "Uma livraria em São Paulo", text: "Os dois foram atrás do último exemplar do mesmo livro. Ninguém levou o livro; saíram com um café marcado.", image: U("1520854221256-17451cc331bf", 1000) },
@@ -113,7 +113,7 @@ async function petalucas() {
   const o = [], W = "w_petalucas", T = "/assets/themes/petalucas/";
   o.push(ins("weddings", {
     id: W, slug: "petala-e-lucas", names: "Pétala & Lucas", date_iso: "2027-02-20T16:00:00-03:00", city: "Piraquara · PR", universe: "timeless", theme: "petalucas",
-    venue_name: "Estância Dom Raul", hero_image: "", rsvp_deadline: "2027-01-20", is_demo: 0, pix_key: "lucas.medeiros97@gmail.com", map_image: T + "mapa.png",
+    venue_name: "Estância Dom Raul", hero_image: "", rsvp_deadline: "2027-01-20", is_demo: 0, pix_key: "lucas.medeiros97@gmail.com", pix_name: "Petala e Lucas", pix_city: "Piraquara", map_image: T + "mapa.png",
     welcome: "Casados no cartório desde 2022, decidimos que 2027 seria o ano de comemorar com as pessoas que a gente mais ama.",
     rsvp_note: "Este é um convite individual e intransferível. A festa não comportará crianças. Apenas entrará com nome na lista, ok?",
     story_json: JSON.stringify([

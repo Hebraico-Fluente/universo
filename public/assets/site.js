@@ -1,6 +1,8 @@
 /** Site público do casal: /c/:slug  (conteúdo vem de /api/site/:slug; nada pessoal de convidados). */
 import { $, $$, esc, longDate, time, countdown, reveal, api, mapsLink, money } from "./ui.js";
 import { icon } from "./icons.js";
+import { brcode } from "./pix.js";
+import { qrcode } from "./vendor/qrcode.js";
 
 const slug = location.pathname.split("/")[2];
 const app = $("#app");
@@ -68,7 +70,7 @@ function render(w, events, messages, universe) {
   if (w.gifts.length || w.pix_key || w.gift_url) html.push(sec("presentes", "Presentes", "Sua presença é <em>o melhor presente</em>",
     `${w.gifts.length ? `<ul class="gifts${w.gifts.some(g => g.icon) ? " rich" : ""}">${w.gifts.map((g, i) => `<li class="gift rv">${g.icon ? `<span class="gico">${icon(g.icon)}</span>` : ""}<div class="gtxt"><h3>${esc(g.title)}</h3>${g.note ? `<p>${esc(g.note)}</p>` : ""}</div><span class="v num">${g.cents ? esc(money(g.cents)) : "Valor livre"}</span>${w.pix_key ? `<button class="btn ghost sm" type="button" data-gift="${i}">Presentear</button>` : ""}</li>`).join("")}</ul>` : ""}
      ${w.gift_url ? `<p class="rv"><a class="btn ghost" href="${esc(w.gift_url)}" target="_blank" rel="noopener">Ver lista de presentes</a></p>` : ""}
-     ${w.pix_key ? `<div class="pix rv"><p><span class="label">Pix dos noivos</span> <code>${esc(w.pix_key)}</code></p><button class="btn sm" type="button" id="copyPix">Copiar chave</button></div>` : ""}
+     ${w.pix_key ? `<div class="pix rv"><p><span class="label">Pix dos noivos</span> <code>${esc(w.pix_key)}</code></p><span class="pix-acts"><button class="btn sm" type="button" id="pixAny">QR Code</button><button class="btn ghost sm" type="button" id="copyPix">Copiar chave</button></span></div>` : ""}
      <p class="direct rv">O valor vai direto para a conta dos noivos, sem comissão de site de casamento.</p>`, "alt"));
 
   if (w.faq.length) html.push(sec("duvidas", "Dúvidas", "Bom <em>saber</em>",
@@ -93,16 +95,29 @@ function render(w, events, messages, universe) {
     ${html.join("")}
   </main>
   <footer class="foot"><div class="wrap"><p>${esc(w.names)} · ${esc(longDate(w.date))}</p><p class="muted">Site feito com Universo · Gueta Studio</p></div></footer>
-  ${w.pix_key ? `<dialog class="pixdlg" id="pixDlg" aria-labelledby="pixT"><form method="dialog"><p class="label">Presente</p><h3 id="pixT"></h3><p class="pv num" id="pixV"></p>
-    <p class="muted">Copie a chave Pix e faça a transferência pelo app do seu banco.</p>
-    <div class="pixkey"><code>${esc(w.pix_key)}</code><button class="btn sm" type="button" id="pixCopy">Copiar chave</button></div>
-    <p class="direct">O valor vai direto para a conta dos noivos, sem comissão.</p><button class="link" value="close">Fechar</button></form></dialog>` : ""}
+  ${w.pix_key ? `<dialog class="pixdlg" id="pixDlg" aria-labelledby="pixT"><div class="dlg-in">
+    <button class="x" type="button" id="pixX" aria-label="Fechar">×</button>
+    <p class="label">Presente</p><h3 id="pixT"></h3><p class="pv num" id="pixV"></p>
+    <label class="field amt" id="pixAmtF" hidden><span>Quanto você quer presentear?</span><input class="in num" id="pixAmt" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" maxlength="12"></label>
+    <div class="qr" id="pixQr" role="img" aria-label="QR Code do Pix"></div>
+    <p class="muted small how">No app do banco: <b>Pix › Ler QR Code</b>. Pelo celular, copie o código e use <b>Pix copia e cola</b>.</p>
+    <button class="btn accent" type="button" id="pixCode">Copiar código Pix</button>
+    <details class="keyalt"><summary>Prefere usar a chave?</summary><div class="pixkey"><code>${esc(w.pix_key)}</code><button class="btn sm" type="button" id="pixCopy">Copiar chave</button></div></details>
+    <form class="gave" id="gave" novalidate>
+      <p><b>Já fez o Pix?</b> Conte para os noivos que o presente é seu.</p>
+      <input class="in" name="author" maxlength="60" placeholder="Seu nome" autocomplete="name" aria-label="Seu nome">
+      <textarea class="in" name="message" rows="2" maxlength="400" placeholder="Um recadinho junto com o presente (opcional)" aria-label="Recado (opcional)"></textarea>
+      <p class="error" id="gaveErr" role="alert"></p>
+      <button class="btn ghost" type="submit">Já presenteei</button>
+    </form>
+    <p class="gave-ok" id="gaveOk" role="status" hidden><b>Obrigado pelo carinho!</b> Os noivos vão receber o seu aviso.</p>
+    <p class="direct">O valor vai direto para a conta dos noivos, sem intermediário e sem comissão.</p>
+  </div></dialog>` : ""}
   ${w.is_demo ? `<p class="demo" role="note">Casamento fictício de demonstração · universo ${esc(universe)} · <a href="/">conheça o Universo</a></p>` : ""}`;
 
   // imagens de fundo via CSSOM (a política de segurança bloqueia estilos inline)
   $$("[data-bg]").forEach(el => { if (el.dataset.bg) el.style.backgroundImage = `url("${el.dataset.bg.replace(/"/g, "")}")`; });
   countdown($("#cd"), w.date);
-  $("#copyPix")?.addEventListener("click", async e => { try { await navigator.clipboard.writeText(w.pix_key); e.target.textContent = "Copiada!"; } catch { e.target.textContent = w.pix_key; } });
   $("#gbForm")?.addEventListener("submit", async e => {
     e.preventDefault(); const f = e.target, err = $("#gbErr"), btn = f.querySelector("button"); err.textContent = "";
     if (f.author.value.trim().length < 2 || f.message.value.trim().length < 2) { err.textContent = "Escreva seu nome e uma mensagem."; return; }
@@ -111,15 +126,7 @@ function render(w, events, messages, universe) {
       f.innerHTML = `<p class="gb-ok"><b>Recado enviado!</b><br>Ele aparece no mural assim que os noivos aprovarem. Obrigado pelo carinho.</p>`; }
     catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = "Enviar recado"; }
   });
-  // presentes: diálogo com valor e chave Pix
-  const dlg = $("#pixDlg");
-  $$("[data-gift]").forEach(b => b.addEventListener("click", () => {
-    const g = w.gifts[+b.dataset.gift];
-    $("#pixT").textContent = g.title; $("#pixV").textContent = g.cents ? money(g.cents) : "Valor livre";
-    $("#pixCopy").textContent = "Copiar chave"; dlg.showModal();
-  }));
-  $("#pixCopy")?.addEventListener("click", async e => { try { await navigator.clipboard.writeText(w.pix_key); e.target.textContent = "Copiada!"; } catch { e.target.textContent = w.pix_key; } });
-  dlg?.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+  if (w.pix_key) gifts(w);
   if (w.quiz.length) quiz($("#quizBox"), w);
 
   const onScroll = () => document.body.classList.toggle("scrolled", scrollY > innerHeight * .6);
@@ -127,6 +134,58 @@ function render(w, events, messages, universe) {
   requestAnimationFrame(() => document.body.classList.add("ready"));
   reveal();
   if (w.theme) import(`/assets/themes/${w.theme}/theme.js`).then(m => m.site?.()).catch(() => {}); // animações da identidade (opcional)
+}
+
+/** Presentes: QR Code e "copia e cola" do Pix com o valor do presente, e o aviso "Já presenteei" para os noivos. */
+function gifts(w) {
+  const dlg = $("#pixDlg"), amt = $("#pixAmt"), gave = $("#gave");
+  let gift = -1, code = "";
+  const cents = () => { const g = w.gifts[gift]; return g?.cents > 0 ? g.cents : parseCents(amt.value); };
+  const draw = () => {
+    const c = cents(), g = w.gifts[gift];
+    code = brcode({ key: w.pix_key, name: w.pix_name, city: w.pix_city, cents: c, description: g ? "Presente " + g.title : "Presente" });
+    const q = qrcode(0, "M"); q.addData(code); q.make();
+    const n = q.getModuleCount(); let d = "";
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) d += `M${k + 4} ${r + 4}h1v1h-1z`;
+    $("#pixQr").innerHTML = `<svg viewBox="0 0 ${n + 8} ${n + 8}" shape-rendering="crispEdges" aria-hidden="true"><rect class="qbg" width="${n + 8}" height="${n + 8}"/><path d="${d}"/></svg>`;
+    if (!(g?.cents > 0)) $("#pixV").textContent = c ? money(c) : "Valor livre";
+    $("#pixCode").textContent = "Copiar código Pix";
+  };
+  const copy = async (btn, text, done) => { try { await navigator.clipboard.writeText(text); btn.textContent = done; } catch { btn.textContent = "Não deu para copiar. Use a chave abaixo."; } };
+  const openGift = i => {
+    gift = i; const g = w.gifts[i];
+    $("#pixT").textContent = g ? g.title : "Pix dos noivos";
+    $("#pixV").textContent = g?.cents ? money(g.cents) : "Valor livre";
+    $("#pixAmtF").hidden = g?.cents > 0; amt.value = "";
+    $("#pixCopy").textContent = "Copiar chave";
+    gave.hidden = false; $("#gaveOk").hidden = true; $("#gaveErr").textContent = "";
+    draw(); dlg.showModal();
+  };
+  $$("[data-gift]").forEach(b => b.addEventListener("click", () => openGift(+b.dataset.gift)));
+  $("#pixAny")?.addEventListener("click", () => openGift(-1));
+  $("#copyPix")?.addEventListener("click", e => copy(e.target, w.pix_key, "Copiada!"));
+  $("#pixCopy").addEventListener("click", e => copy(e.target, w.pix_key, "Copiada!"));
+  $("#pixCode").addEventListener("click", e => copy(e.target, code, "Código copiado! Cole no app do banco"));
+  amt.addEventListener("input", draw);
+  $("#pixX").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+  gave.addEventListener("submit", async e => {
+    e.preventDefault(); const err = $("#gaveErr"), btn = gave.querySelector("button"); err.textContent = "";
+    if (gave.author.value.trim().length < 2) { err.textContent = "Escreva seu nome para os noivos saberem quem presenteou."; gave.author.focus(); return; }
+    btn.disabled = true; btn.textContent = "Enviando…";
+    try {
+      await api(`/api/site/${slug}/presentes`, { method: "POST", body: { gift: gift >= 0 ? gift : null, cents: cents() || null, author: gave.author.value, message: gave.message.value } });
+      gave.hidden = true; gave.reset(); $("#gaveOk").hidden = false;
+    } catch (x) { err.textContent = x.message; }
+    btn.disabled = false; btn.textContent = "Já presenteei";
+  });
+}
+/** "1.234,56", "50", "R$ 80,5" → centavos */
+function parseCents(v) {
+  v = String(v || "").replace(/[R$\s]/g, "");
+  if (v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
+  const n = Math.round(parseFloat(v) * 100);
+  return Number.isFinite(n) && n > 0 && n <= 10000000 ? n : 0;
 }
 
 /** Quiz "Quanto você conhece o casal?" — uma pergunta por vez, com a curiosidade depois de cada resposta. */

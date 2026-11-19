@@ -172,3 +172,19 @@ CREATE TABLE IF NOT EXISTS access_invites (
 );
 -- Quiz "Quanto você conhece o casal?" (perguntas só com fatos que o casal publicou)
 ALTER TABLE weddings ADD COLUMN quiz_json TEXT NOT NULL DEFAULT '[]';   -- [{q, options[], answer(index), fact}]
+-- Pix com QR Code e "Já presenteei"
+ALTER TABLE weddings ADD COLUMN pix_name TEXT NOT NULL DEFAULT '';   -- nome no QR Code (o app do banco mostra o titular real da chave)
+ALTER TABLE weddings ADD COLUMN pix_city TEXT NOT NULL DEFAULT '';   -- cidade no QR Code (campo obrigatório do padrão)
+
+CREATE TABLE IF NOT EXISTS gift_notices (
+  id         TEXT PRIMARY KEY,
+  wedding_id TEXT NOT NULL REFERENCES weddings(id) ON DELETE CASCADE,
+  gift       TEXT NOT NULL,                      -- título do presente (vem da lista do casal, não do convidado)
+  cents      INTEGER NOT NULL DEFAULT 0,         -- valor do presente; em "valor livre", o que o convidado informou
+  author     TEXT NOT NULL,
+  message    TEXT NOT NULL DEFAULT '',
+  checked    INTEGER NOT NULL DEFAULT 0,         -- 1 = os noivos conferiram no extrato
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_gift_notices_w ON gift_notices(wedding_id, created_at);
+

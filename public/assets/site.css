@@ -213,7 +213,24 @@
 .gifts.rich .btn{grid-area:b;justify-self:end}
 .pixdlg{width:min(440px,92vw);padding:0;border:0;border-radius:var(--r-lg);background:var(--paper);color:var(--ink);box-shadow:0 40px 80px -30px rgba(0,0,0,.45)}
 .pixdlg::backdrop{background:rgba(20,20,20,.45);backdrop-filter:blur(3px)}
-.pixdlg form{display:grid;gap:12px;padding:28px}
+.pixdlg{max-height:92dvh;overflow:auto;overscroll-behavior:contain}
+.dlg-in{position:relative;display:grid;gap:12px;padding:28px}
+.dlg-in [hidden]{display:none!important}
+.dlg-in .x{position:absolute;top:10px;right:12px;width:44px;height:44px;border:0;background:none;font-size:28px;line-height:1;color:var(--muted);cursor:pointer;border-radius:50%}
+.dlg-in .x:hover{background:var(--paper-2)}
+.qr{justify-self:center;width:min(220px,62vw);aspect-ratio:1;padding:6px;border-radius:var(--r-lg);background:#fff;box-shadow:0 0 0 1px var(--line)}
+.qr svg{display:block;width:100%;height:100%}
+.qr .qbg{fill:#fff}
+.qr path{fill:#1f2a22}
+.how{text-align:center;margin:0}
+.amt .in{font-size:20px}
+.keyalt summary{cursor:pointer;color:var(--muted);font-size:14px;padding:6px 0}
+.keyalt .pixkey{margin-top:6px}
+.gave{display:grid;gap:8px;margin-top:6px;padding-top:16px;border-top:1px solid var(--line)}
+.gave p{margin:0}
+.gave .error:empty{display:none}
+.gave-ok{margin:6px 0 0;padding:14px 16px;border-radius:var(--r-lg);background:var(--paper-2);text-align:center}
+.pix-acts{display:flex;gap:8px;flex-wrap:wrap}
 .pixdlg h3{font-size:var(--t-h3)}
 .pv{font:400 40px/1 var(--serif);color:var(--accent)}
 .pixkey{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:var(--r-lg);background:var(--paper-2)}

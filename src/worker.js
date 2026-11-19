@@ -13,6 +13,7 @@
  *   GET  /api/invite/:token                  convite da família (limite por IP; token só por hash)
  *   POST /api/invite/:token/rsvp             respostas por pessoa e por evento
  *   POST /api/site/:slug/recados             recado no mural (só aparece no site depois que os noivos aprovam)
+ *   POST /api/site/:slug/presentes           "Já presenteei": aviso do convidado depois do Pix (só os noivos veem)
  *
  * API dos noivos (sessão + papel; o casamento vem SEMPRE da sessão)
  *   POST /api/auth/login | /api/auth/logout   GET /api/me
@@ -29,6 +30,8 @@
  *   GET  /api/admin/budget/simulate?extra=30  simula mais convidados com base nos contratos por pessoa
  *   GET  /api/admin/recados                   recados do mural (pendentes e aprovados)
  *   POST /api/admin/recados/:id/approve       aprova um recado   ·   DELETE /api/admin/recados/:id   apaga
+ *   GET  /api/admin/presentes                 avisos de presentes recebidos por Pix
+ *   POST /api/admin/presentes/:id/check       marca/desmarca "conferido no extrato"   ·   DELETE /api/admin/presentes/:id   apaga
  *   GET  /api/admin/export                    exporta todos os dados do casamento (LGPD)
  */
 import { json, err, HttpError, fail, str, int, oneOf, isoDate, body, randomToken, uid, sha256, hashPassword, safeEqual, rateLimit, clientIp, audit, parseJson } from "./lib.js";
@@ -92,6 +95,7 @@ async function api(req, env, url) {
   // públicas
   if (m === "GET" && (r = p.match(/^\/api\/site\/([a-z0-9-]{3,60})$/))) return siteData(env, r[1]);
   if (m === "POST" && (r = p.match(/^\/api\/site\/([a-z0-9-]{3,60})\/recados$/))) { sameOrigin(req, url); return postMessage(req, env, r[1]); }
+  if (m === "POST" && (r = p.match(/^\/api\/site\/([a-z0-9-]{3,60})\/presentes$/))) { sameOrigin(req, url); return postGiftNotice(req, env, r[1]); }
   if ((r = p.match(/^\/api\/invite\/([A-Za-z0-9_-]{16,64})(\/rsvp)?$/))) {
     if (m === "GET" && !r[2]) return inviteData(req, env, r[1]);
     if (m === "POST" && r[2]) { sameOrigin(req, url); return inviteRsvp(req, env, r[1]); }
@@ -129,6 +133,13 @@ async function api(req, env, url) {
       if (!own) fail(404, "Recado não encontrado", "not_found");
       if (m === "POST" && r[2]) { await env.DB.prepare("UPDATE guestbook SET status = 'approved' WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); return json({ ok: true }); }
       if (m === "DELETE" && !r[2]) { await env.DB.prepare("DELETE FROM guestbook WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); await audit(env, W, actor, "guestbook.delete", r[1]); return json({ ok: true }); }
+    }
+    if (p === "/api/admin/presentes" && m === "GET") return json({ gifts: (await env.DB.prepare("SELECT id, gift, cents, author, message, checked, created_at FROM gift_notices WHERE wedding_id = ? ORDER BY created_at DESC").bind(W).all()).results });
+    if ((r = p.match(/^\/api\/admin\/presentes\/([\w-]{2,40})(\/check)?$/))) {
+      const own = await env.DB.prepare("SELECT id, checked FROM gift_notices WHERE id = ? AND wedding_id = ?").bind(r[1], W).first();
+      if (!own) fail(404, "Aviso não encontrado", "not_found");
+      if (m === "POST" && r[2]) { await env.DB.prepare("UPDATE gift_notices SET checked = ? WHERE id = ? AND wedding_id = ?").bind(own.checked ? 0 : 1, r[1], W).run(); return json({ ok: true, checked: !own.checked }); }
+      if (m === "DELETE" && !r[2]) { await env.DB.prepare("DELETE FROM gift_notices WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); await audit(env, W, actor, "gift_notice.delete", r[1]); return json({ ok: true }); }
     }
   }
   return err(404, "Não encontrado", "not_found");
@@ -239,9 +250,23 @@ async function postMessage(req, env, slug) {
   await env.DB.prepare("INSERT INTO guestbook (id, wedding_id, author, message) VALUES (?, ?, ?, ?)").bind(uid("m_"), w.id, author, message).run();
   return json({ ok: true, status: "pending" }, 201);
 }
+/** "Já presenteei": o título e o valor vêm da lista do casal; só o "valor livre" aceita o valor informado pelo convidado. */
+async function postGiftNotice(req, env, slug) {
+  const w = await env.DB.prepare("SELECT id, pix_key, gifts_json FROM weddings WHERE slug = ?").bind(slug).first();
+  if (!w || !w.pix_key) fail(404, "Lista de presentes não encontrada", "not_found");
+  await rateLimit(env, "gift:" + clientIp(req), 6);
+  const b = await body(req, 4000);
+  const gifts = parseJson(w.gifts_json, []);
+  const g = b.gift == null ? { title: "Pix livre", cents: 0 } : gifts[int(b.gift,{ min: 0, max: Math.max(0, gifts.length - 1), field: "Presente" })];
+  if (!g) fail(400, "Presente: valor inválido", "invalid");
+  const cents = g.cents > 0 ? g.cents : (b.cents == null || b.cents === "" ? 0 : int(b.cents, { min: 0, max: 10_000_000, field: "Valor" }));
+  const author = str(b.author, { min: 2, max: 60, field: "Seu nome" }), message = str(b.message, { max: 400, field: "Mensagem" });
+  await env.DB.prepare("INSERT INTO gift_notices (id, wedding_id, gift, cents, author, message) VALUES (?, ?, ?, ?, ?, ?)").bind(uid("p_"), w.id, String(g.title).slice(0, 80), cents, author, message).run();
+  return json({ ok: true }, 201);
+}
 function publicWedding(w) {
   return { names: w.names, date: w.date_iso, city: w.city, universe: w.universe, welcome: w.welcome, hero_image: w.hero_image,
-    story: parseJson(w.story_json, []), gifts: parseJson(w.gifts_json, []), pix_key: w.pix_key, faq: parseJson(w.faq_json, []),
+    story: parseJson(w.story_json, []), gifts: parseJson(w.gifts_json, []), pix_key: w.pix_key, pix_name: w.pix_name || w.names, pix_city: w.pix_city || w.city, faq: parseJson(w.faq_json, []),
     rsvp_deadline: w.rsvp_deadline, is_demo: !!w.is_demo, slug: w.slug,
     theme: w.theme || "", venue_name: w.venue_name || "", schedule: parseJson(w.schedule_json, []), dress: parseJson(w.dress_json, []),
     map_image: w.map_image || "", gift_url: w.gift_url || "", rsvp_note: w.rsvp_note || "", guestbook: !!w.guestbook,
@@ -311,8 +336,9 @@ async function overview(env, W) {
   const hh = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(responded_at IS NOT NULL) AS responded FROM households WHERE wedding_id = ?").bind(W).first();
   const diets = (await env.DB.prepare("SELECT COUNT(*) AS n FROM guests WHERE wedding_id = ? AND diet <> ''").bind(W).first()).n;
   const b = await budgetTotals(env, W);
+  const gf = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(cents), 0) AS cents, COALESCE(SUM(checked = 0), 0) AS unchecked FROM gift_notices WHERE wedding_id = ?").bind(W).first();
   return json({ wedding: { ...w, is_demo: !!w.is_demo }, events: events.map(e => ({ ...e, pending: e.invited - e.yes - e.no })),
-    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b });
+    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b, gifts: gf });
 }
 async function guestList(env, W) {
   const hs = (await env.DB.prepare("SELECT id, name, greeting, max_guests, revoked, token_hash IS NOT NULL AS has_link, token_at, responded_at, note_to_couple FROM households WHERE wedding_id = ? ORDER BY created_at").bind(W).all()).results;
@@ -444,6 +470,7 @@ async function exportData(env, W, actor) {
     budget_categories: await q("SELECT * FROM budget_categories WHERE wedding_id = ?"),
     budget_items: await q("SELECT * FROM budget_items WHERE wedding_id = ?"),
     guestbook: await q("SELECT * FROM guestbook WHERE wedding_id = ?"),
+    gift_notices: await q("SELECT * FROM gift_notices WHERE wedding_id = ?"),
   };
   await audit(env, W, actor, "export");
   return json(data, 200, { "Content-Disposition": `attachment; filename="casamento-${data.wedding.slug}.json"` });

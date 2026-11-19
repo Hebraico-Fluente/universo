@@ -83,7 +83,7 @@ function shell() {
   <header class="bar"><div class="wrap">
     <a class="brand" href="/">Universo</a>
     <nav class="tabs" aria-label="Seções do painel">
-      <a href="#geral" data-v="geral">Visão geral</a><a href="#convidados" data-v="convidados">Convidados</a><a href="#orcamento" data-v="orcamento">Orçamento</a>
+      <a href="#geral" data-v="geral">Visão geral</a><a href="#convidados" data-v="convidados">Convidados</a><a href="#orcamento" data-v="orcamento">Orçamento</a><a href="#presentes" data-v="presentes">Presentes</a>
     </nav>
     <div class="who"><a class="link" href="/c/${esc(w.slug)}" target="_blank" rel="noopener">Ver o site</a><button class="link" type="button" id="logout">Sair</button></div>
   </div></header>
@@ -97,7 +97,7 @@ function route() {
   view = location.hash.slice(1) || "geral";
   $$(".tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.v === view ? "page" : "false"));
   viewEl().onclick = null;
-  ({ geral: overview, convidados: guests, orcamento: budget }[view] || overview)();
+  ({ geral: overview, convidados: guests, orcamento: budget, presentes: gifts }[view] || overview)();
 }
 const viewEl = () => $("#view");
 const fail = e => { viewEl().innerHTML = `<p class="error">${esc(e.message)}</p>`; if (e.status === 401) loginView(); };
@@ -113,6 +113,7 @@ async function overview() {
     const alerts = [];
     if (pendingHH) alerts.push(`${pendingHH} ${pendingHH > 1 ? "famílias ainda não responderam" : "família ainda não respondeu"}. <a href="#convidados">Ver quem falta</a>`);
     if (o.diets) alerts.push(`${o.diets} ${o.diets > 1 ? "pessoas informaram" : "pessoa informou"} restrição alimentar. Lembre de passar ao buffet.`);
+    if (o.gifts?.unchecked) alerts.push(`${o.gifts.unchecked} ${o.gifts.unchecked > 1 ? "presentes avisados por Pix ainda não foram conferidos" : "presente avisado por Pix ainda não foi conferido"} no extrato. <a href="#presentes">Ver presentes</a>`);
     if (b.to_pay > 0) alerts.push(`Faltam ${money(b.to_pay)} a pagar em contratos fechados. <a href="#orcamento">Ver vencimentos</a>`);
     viewEl().innerHTML = `
       <section class="hello">
@@ -211,6 +212,32 @@ async function guests_(link, who) {
 }
 
 /* ---------------- orçamento ---------------- */
+/* ---------------- presentes ---------------- */
+async function gifts() {
+  viewEl().innerHTML = `<p class="muted">Carregando…</p>`;
+  try {
+    const d = await api("/api/admin/presentes"), list = d.gifts;
+    const total = list.reduce((s, g) => s + g.cents, 0), ok = list.filter(g => g.checked).reduce((s, g) => s + g.cents, 0);
+    viewEl().innerHTML = `
+      <header class="vh"><div><p class="label">Presentes</p><h1>${list.length ? `${list.length} ${list.length > 1 ? "presentes avisados" : "presente avisado"} · ${money(total)}` : "Nenhum presente avisado ainda"}</h1></div></header>
+      <p class="muted gnote">Quando um convidado faz o Pix pelo site e toca em “Já presenteei”, o aviso aparece aqui. O dinheiro cai direto na conta de vocês, sem intermediário: confiram no extrato e marquem como conferido.</p>
+      ${list.length ? `<dl class="kv wide"><div><dt>Avisados</dt><dd class="num">${money(total)}</dd></div><div><dt>Conferidos no extrato</dt><dd class="num strong">${money(ok)}</dd></div><div><dt>A conferir</dt><dd class="num">${list.filter(g => !g.checked).length}</dd></div></dl>
+      <ul class="glist">${list.map(g => `<li class="gn${g.checked ? " done" : ""}">
+        <div class="gn-h"><b>${esc(g.author)}</b><span class="num">${g.cents ? money(g.cents) : "valor não informado"}</span></div>
+        <p class="small muted">${esc(g.gift)} · ${esc(new Date(g.created_at.replace(" ", "T") + "Z").toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }))}</p>
+        ${g.message ? `<p class="gn-msg">“${esc(g.message)}”</p>` : ""}
+        <div class="row-btns"><button class="btn ${g.checked ? "ghost " : ""}sm" type="button" data-check="${esc(g.id)}">${g.checked ? "✓ Conferido" : "Marcar como conferido"}</button><button class="link small danger" type="button" data-gdel="${esc(g.id)}">Apagar</button></div>
+      </li>`).join("")}</ul>` : ""}`;
+    viewEl().onclick = async e => {
+      const c = e.target.closest("[data-check]"), x = e.target.closest("[data-gdel]");
+      try {
+        if (c) { await api(`/api/admin/presentes/${c.dataset.check}/check`, { method: "POST" }); gifts(); }
+        if (x && confirm("Apagar este aviso de presente?")) { await api(`/api/admin/presentes/${x.dataset.gdel}`, { method: "DELETE" }); gifts(); }
+      } catch (er) { alert(er.message); }
+    };
+  } catch (e) { fail(e); }
+}
+
 async function budget() {
   viewEl().innerHTML = `<p class="muted">Carregando…</p>`;
   try {

@@ -133,6 +133,31 @@ r = await call("POST", `/api/admin/recados/${rec.id}/approve`);
 j = await (await call("GET", "/api/site/helena-e-rafael")).json();
 ok(r.status === 200 && j.messages.some(m => m.message === "Felicidades!"), "recado aprovado aparece no site");
 
+/* ---------- presentes por Pix ("Já presenteei") ---------- */
+j = await (await call("GET", "/api/site/helena-e-rafael")).json();
+ok(j.wedding.pix_name && j.wedding.pix_city, "site traz nome e cidade para o QR Code do Pix");
+const { brcode, crc16 } = await import("../public/assets/pix.js");
+ok(crc16("00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***6304") === "1D3D", "CRC do Pix confere com o exemplo do Banco Central");
+const code = brcode({ key: j.wedding.pix_key, name: j.wedding.pix_name, city: j.wedding.pix_city, cents: 30000, description: "Presente Jantar na lua de mel" });
+ok(code.includes("5406300.00") && code.includes(j.wedding.pix_key) && crc16(code.slice(0, -4)) === code.slice(-4), "código Pix com valor, chave e CRC válidos");
+r = await call("POST", "/api/site/helena-e-rafael/presentes", { gift: 0, cents: 1, author: "Tia Lúcia", message: "Boa viagem!" }, { ip: "30.0.0.1" });
+ok(r.status === 201, "convidado avisa que presenteou");
+r = await call("POST", "/api/site/helena-e-rafael/presentes", { gift: 3, cents: 5000, author: "Primo Beto" }, { ip: "30.0.0.1" });
+ok(r.status === 201, "valor livre aceita o valor informado");
+ok((await call("POST", "/api/site/helena-e-rafael/presentes", { gift: 99, author: "Ana" }, { ip: "30.0.0.1" })).status === 400, "presente inexistente é recusado");
+ok((await call("POST", "/api/site/helena-e-rafael/presentes", { gift: 0, author: "Ana" }, { origin: "https://spam.com", ip: "30.0.0.1" })).status === 403, "aviso de presente só a partir do próprio site");
+let gl = 0; for (let i = 0; i < 8; i++) if ((await call("POST", "/api/site/helena-e-rafael/presentes", { gift: 0, author: "Robô" }, { ip: "30.0.0.2" })).status === 429) gl++;
+ok(gl >= 2, "avisos de presente limitados por aparelho");
+ok(!JSON.stringify(await (await call("GET", "/api/site/helena-e-rafael")).json()).includes("Tia Lúcia"), "avisos de presente não aparecem no site público");
+j = await (await call("GET", "/api/admin/presentes")).json();
+const tia = j.gifts.find(g => g.author === "Tia Lúcia"), beto = j.gifts.find(g => g.author === "Primo Beto");
+ok(tia && tia.cents === 30000 && tia.gift === "Jantar na lua de mel" && !tia.checked, "valor e título vêm da lista do casal, não do convidado");
+ok(beto && beto.cents === 5000, "noivos veem o valor livre informado");
+r = await call("POST", `/api/admin/presentes/${tia.id}/check`);
+ok(r.status === 200 && (await r.json()).checked === true, "noivos marcam como conferido no extrato");
+j = await (await call("GET", "/api/admin/overview")).json();
+ok(j.gifts.n >= 2 && j.gifts.unchecked >= 1, "visão geral conta presentes a conferir");
+
 /* ---------- isolamento entre casais ---------- */
 const other = await login(DEMO.other.email, DEMO.other.password, "10.0.0.8");
 const oc = other.cookie;
@@ -141,6 +166,7 @@ ok(j.households.length === 1 && j.households[0].name === "Convidado de outro cas
 ok((await call("POST", "/api/admin/households/h_andrade/revoke", null, { ck: oc })).status === 404, "outro casal não revoga convite alheio");
 ok((await call("PATCH", "/api/admin/budget/items/b1", { paid_cents: 0 }, { ck: oc })).status === 404, "outro casal não altera orçamento alheio");
 ok((await call("POST", `/api/admin/recados/${rec.id}/approve`, null, { ck: oc })).status === 404, "outro casal não modera recados alheios");
+ok((await call("POST", `/api/admin/presentes/${tia.id}/check`, null, { ck: oc })).status === 404 && (await (await call("GET", "/api/admin/presentes", null, { ck: oc })).json()).gifts.length === 0, "outro casal não vê nem mexe em presentes alheios");
 ok((await call("DELETE", "/api/admin/households/h_rossi", null, { ck: oc })).status === 404 && env._db.prepare("SELECT COUNT(*) AS n FROM households WHERE id='h_rossi'").get().n === 1, "outro casal não apaga família alheia");
 
 /* ---------- exportação ---------- */
