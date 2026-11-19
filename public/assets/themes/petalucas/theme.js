@@ -1,6 +1,6 @@
 /**
  * Animações da identidade de Pétala & Lucas.
- * Pétalas caindo (o nome dela é Pétala), corações no "Confirmar presença", linha do cronograma que se desenha.
+ * Corações no "Confirmar presença", linha do cronograma que se desenha (as pétalas caindo foram retiradas).
  * Tudo desligado para quem prefere movimento reduzido.
  */
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -51,7 +51,7 @@ function hearts(from) {
   }
 }
 
-/** Easter egg: 5 toques no coração do logo → chuva de pétalas e a música do Djavan. Funciona também com movimento reduzido (sem a chuva). */
+/** Easter egg: 5 toques no coração do logo → a música do Djavan. */
 function djavan() {
   const logo = document.querySelector(".hero-logo");
   if (!logo) return;
@@ -59,7 +59,7 @@ function djavan() {
   logo.setAttribute("aria-label", "Pétala & Lucas (toque 5 vezes para uma surpresa)");
   let taps = [], card;
   const show = () => {
-    if (!reduce()) petals(document.body, 40, { burst: true });
+    // (chuva de pétalas removida a pedido do casal)
     if (!card) {
       card = document.createElement("div"); card.className = "djavan"; card.setAttribute("role", "dialog"); card.setAttribute("aria-label", "Surpresa");
       const q = encodeURIComponent("Djavan Pétala");
@@ -85,8 +85,6 @@ function djavan() {
 export function site() {
   djavan();
   if (reduce()) return;
-  const hero = document.querySelector(".hero");
-  if (hero) petals(hero, innerWidth < 640 ? 10 : 16);
 
   // corações no botão principal
   document.querySelectorAll(".hero-acts .btn.accent, .gb-form .btn").forEach(b => b.addEventListener("click", () => hearts(b)));
@@ -108,6 +106,6 @@ export function site() {
 
 export function envelope(env) {
   if (reduce()) return;
-  setTimeout(() => petals(document.body, 22, { burst: true }), 350);
+
   env.classList.add("pl-open");
 }
