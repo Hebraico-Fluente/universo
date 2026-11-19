@@ -6,6 +6,8 @@ let me, view = location.hash.slice(1) || "geral";
 
 boot();
 async function boot() {
+  const setup = new URLSearchParams(location.search).get("acesso");
+  if (setup) { app.removeAttribute("aria-busy"); return setupView(setup); }
   try { me = await api("/api/me"); shell(); }
   catch (e) { if (e.status === 401) loginView(); else app.innerHTML = `<p class="wrap pad">${esc(e.message)}</p>`; }
   finally { app.removeAttribute("aria-busy"); }
@@ -35,6 +37,42 @@ function loginView() {
     $("#err").textContent = ""; b.disabled = true; b.textContent = "Entrando…";
     try { await api("/api/auth/login", { method: "POST", body: { email: f.email.value, password: f.password.value } }); me = await api("/api/me"); shell(); }
     catch (x) { $("#err").textContent = x.message; b.disabled = false; b.textContent = "Entrar"; }
+  });
+}
+
+/* ---------------- criar acesso (link de uso único) ---------------- */
+async function setupView(token) {
+  let info;
+  try { info = await api(`/api/auth/setup/${encodeURIComponent(token)}`); }
+  catch (e) { app.innerHTML = `<section class="login"><div class="login-art" role="img" aria-label="Detalhe de flores de casamento"></div><div class="login-box"><a class="brand" href="/">Universo</a><h1>Link indisponível.</h1><p class="muted">${esc(e.message)}</p><a class="btn ghost" href="/painel">Ir para a entrada</a></div></section>`; return; }
+  app.innerHTML = `
+  <section class="login">
+    <div class="login-art" role="img" aria-label="Detalhe de flores de casamento"></div>
+    <div class="login-box">
+      <a class="brand" href="/">Universo</a>
+      <p class="label">Painel de ${esc(info.wedding)}</p>
+      <h1>Crie o seu acesso.</h1>
+      <p class="muted">Escolha o e-mail e a senha que vão usar para entrar. Este link funciona uma única vez.</p>
+      <form id="setup" novalidate>
+        <label class="field"><span>Seu nome</span><input class="in" name="name" autocomplete="name" required></label>
+        <label class="field"><span>E-mail</span><input class="in" name="email" type="email" autocomplete="username" required></label>
+        <label class="field"><span>Senha (mínimo 10 caracteres)</span><input class="in" name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+        <label class="field"><span>Repita a senha</span><input class="in" name="password2" type="password" autocomplete="new-password" required></label>
+        <p class="error" id="err" role="alert"></p>
+        <button class="btn" type="submit">Criar acesso e entrar</button>
+      </form>
+    </div>
+  </section>`;
+  $("#setup").addEventListener("submit", async e => {
+    e.preventDefault(); const f = e.target, b = f.querySelector("button"), err = $("#err"); err.textContent = "";
+    if (f.password.value.length < 10) return void (err.textContent = "A senha precisa ter pelo menos 10 caracteres.");
+    if (f.password.value !== f.password2.value) return void (err.textContent = "As duas senhas não são iguais.");
+    b.disabled = true; b.textContent = "Criando…";
+    try {
+      await api(`/api/auth/setup/${encodeURIComponent(token)}`, { method: "POST", body: { name: f.name.value, email: f.email.value, password: f.password.value } });
+      history.replaceState(null, "", "/painel"); // tira o link usado da barra de endereço
+      me = await api("/api/me"); shell();
+    } catch (x) { err.textContent = x.message; b.disabled = false; b.textContent = "Criar acesso e entrar"; }
   });
 }
 

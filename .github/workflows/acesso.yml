@@ -1,0 +1,32 @@
+name: Criar acesso ao painel
+# Recebe só o HASH do link (gerado localmente com scripts/access-link.mjs). O link em si nunca passa por aqui.
+on:
+  workflow_dispatch:
+    inputs:
+      slug: { description: "Slug do casamento (ex.: petala-e-lucas)", required: true }
+      role: { description: "Papel", required: true, default: owner, type: choice, options: [owner, planner, viewer] }
+      token_hash: { description: "Hash do link (44 caracteres)", required: true }
+      dias: { description: "Validade em dias", required: true, default: "14" }
+jobs:
+  criar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Validar entradas
+        env: { SLUG: "${{ inputs.slug }}", HASH: "${{ inputs.token_hash }}", DIAS: "${{ inputs.dias }}" }
+        run: |
+          echo "$SLUG" | grep -Eq '^[a-z0-9-]{3,60}$' || { echo "::error::slug inválido"; exit 1; }
+          echo "$HASH" | grep -Eq '^[A-Za-z0-9+/]{43}=$' || { echo "::error::hash inválido"; exit 1; }
+          echo "$DIAS" | grep -Eq '^[0-9]{1,2}$' || { echo "::error::dias inválido"; exit 1; }
+      - name: Gravar convite de acesso
+        env:
+          CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          SLUG: "${{ inputs.slug }}"
+          ROLE: "${{ inputs.role }}"
+          HASH: "${{ inputs.token_hash }}"
+          DIAS: "${{ inputs.dias }}"
+        run: |
+          SQL="INSERT INTO access_invites (token_hash, wedding_id, role, expires_at) SELECT '$HASH', id, '$ROLE', strftime('%Y-%m-%dT%H:%M:%fZ','now','+$DIAS days') FROM weddings WHERE slug = '$SLUG';"
+          out=$(npx -y wrangler@4 d1 execute universo --remote --json --command "$SQL")
+          echo "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s)[0].meta.changes;console.log("linhas gravadas:",n);if(n!==1){console.log("::error::casamento não encontrado");process.exit(1)}})'

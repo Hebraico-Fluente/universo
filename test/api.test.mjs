@@ -2,6 +2,7 @@
 import { handle } from "../src/worker.js";
 import { localEnv } from "./local-env.mjs";
 import { DEMO } from "../scripts/seed.mjs";
+import { sha256 } from "../src/lib.js";
 
 const env = await localEnv();
 const O = "https://universo.test";
@@ -155,6 +156,27 @@ ok(blocked >= 4, "chutes de token são limitados por IP");
 blocked = 0;
 for (let i = 0; i < 12; i++) if ((await login(DEMO.login.email, "errada-" + i, "77.7.7.7")).r.status === 429) blocked++;
 ok(blocked >= 1, "tentativas de login são limitadas");
+
+/* ---------- convite de acesso ao painel (uso único) ---------- */
+const setupTok = "acesso-teste-petala-lucas-0001";
+env._db.prepare("INSERT INTO access_invites (token_hash, wedding_id, role, expires_at) VALUES (?, 'w_petalucas', 'owner', ?)").run(await sha256(setupTok), new Date(Date.now() + 864e5).toISOString());
+env._db.prepare("INSERT INTO access_invites (token_hash, wedding_id, role, expires_at) VALUES (?, 'w_petalucas', 'owner', ?)").run(await sha256("acesso-vencido-000000000001"), new Date(Date.now() - 1000).toISOString());
+j = await (await call("GET", "/api/auth/setup/" + setupTok, null, { ck: "" })).json();
+ok(j.wedding === "Pétala & Lucas", "link de acesso mostra de qual casamento é");
+ok((await call("GET", "/api/auth/setup/acesso-vencido-000000000001", null, { ck: "" })).status === 404, "link de acesso vencido não vale");
+r = await call("POST", "/api/auth/setup/" + setupTok, { name: "Pétala", email: "petala@exemplo.com", password: "curta" }, { ck: "" });
+ok(r.status === 400, "senha curta é recusada");
+r = await call("POST", "/api/auth/setup/" + setupTok, { name: "Pétala", email: "petala@exemplo.com", password: "uma-senha-bem-longa" }, { ck: "", origin: "https://golpe.com" });
+ok(r.status === 403, "criação de acesso de outro site é bloqueada");
+r = await call("POST", "/api/auth/setup/" + setupTok, { name: "Pétala", email: "Petala@Exemplo.com", password: "uma-senha-bem-longa" }, { ck: "" });
+const pc = (r.headers.get("Set-Cookie") || "").split(";")[0];
+ok(r.status === 201 && pc, "casal cria o acesso e já entra");
+j = await (await call("GET", "/api/me", null, { ck: pc })).json();
+ok(j.wedding.names === "Pétala & Lucas" && j.role === "owner", "acesso ligado ao casamento certo, como dono");
+j = await (await call("GET", "/api/admin/guests", null, { ck: pc })).json();
+ok(j.households.length === 1 && j.households[0].name.includes("Exemplo"), "casal vê só os próprios convites");
+ok((await call("POST", "/api/auth/setup/" + setupTok, { name: "Outro", email: "x@exemplo.com", password: "outra-senha-longa" }, { ck: "" })).status === 404, "link de acesso só vale uma vez");
+ok((await login("petala@exemplo.com", "uma-senha-bem-longa", "10.0.0.7")).r.status === 200, "depois, entra com e-mail e senha escolhidos");
 
 /* ---------- sair ---------- */
 await call("POST", "/api/auth/logout");

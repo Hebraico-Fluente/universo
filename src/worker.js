@@ -16,6 +16,7 @@
  *
  * API dos noivos (sessão + papel; o casamento vem SEMPRE da sessão)
  *   POST /api/auth/login | /api/auth/logout   GET /api/me
+ *   GET|POST /api/auth/setup/:token            convite de acesso ao painel (uso único): escolhe e-mail e senha
  *   GET  /api/admin/overview                  números do painel
  *   GET  /api/admin/guests                    famílias, pessoas e respostas
  *   POST /api/admin/households                cria família convidada (devolve o link uma única vez)
@@ -98,6 +99,10 @@ async function api(req, env, url) {
   // autenticação
   if (p === "/api/auth/login" && m === "POST") { sameOrigin(req, url); return login(req, env, url); }
   if (p === "/api/auth/logout" && m === "POST") { sameOrigin(req, url); return logout(req, env); }
+  if ((r = p.match(/^\/api\/auth\/setup\/([A-Za-z0-9_-]{20,64})$/))) {
+    if (m === "GET") return setupInfo(req, env, r[1]);
+    if (m === "POST") { sameOrigin(req, url); return setupAccess(req, env, url, r[1]); }
+  }
   if (p === "/api/me" && m === "GET") { const s = await session(req, env); return json({ user: { name: s.user_name, email: s.email }, wedding: { id: s.wedding_id, names: s.names, slug: s.slug, is_demo: !!s.is_demo }, role: s.role }); }
 
   // área dos noivos
@@ -169,6 +174,45 @@ async function login(req, env, url) {
   const name = secure ? COOKIE : "sess"; // __Host- exige HTTPS; em localhost usa nome simples
   return json({ ok: true }, 200, { "Set-Cookie": `${name}=${raw}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}` });
 }
+/* ---------------- convite de acesso ao painel ---------------- */
+async function accessInvite(req, env, token) {
+  await rateLimit(env, "setup:" + clientIp(req), 20);
+  const inv = await env.DB.prepare("SELECT a.*, w.names FROM access_invites a JOIN weddings w ON w.id = a.wedding_id WHERE a.token_hash = ?").bind(await sha256(token)).first();
+  if (!inv || inv.used_at || inv.expires_at < new Date().toISOString()) fail(404, "Este link de acesso não vale mais. Peça um novo ao Gueta Studio.", "setup_invalid");
+  return inv;
+}
+async function setupInfo(req, env, token) {
+  const inv = await accessInvite(req, env, token);
+  return json({ wedding: inv.names, role: inv.role });
+}
+async function setupAccess(req, env, url, token) {
+  const inv = await accessInvite(req, env, token);
+  const b = await body(req);
+  const name = str(b.name, { min: 2, max: 80, field: "Seu nome" });
+  const email = str(b.email, { min: 5, max: 160, field: "E-mail" }).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail(400, "E-mail inválido", "invalid");
+  const password = typeof b.password === "string" ? b.password : "";
+  if (password.length < 10 || password.length > 200) fail(400, "A senha precisa ter pelo menos 10 caracteres", "weak_password");
+  let user = await env.DB.prepare("SELECT id, pass_hash, pass_salt FROM users WHERE email = ?").bind(email).first();
+  if (user) {
+    // e-mail já cadastrado: só liga ao casamento se a senha for a da conta
+    const { hash } = await hashPassword(password, user.pass_salt);
+    if (!safeEqual(hash, user.pass_hash)) fail(409, "Este e-mail já tem conta. Use a senha dessa conta para entrar.", "email_exists");
+  } else {
+    const pw = await hashPassword(password);
+    user = { id: uid("u_") };
+    await env.DB.prepare("INSERT INTO users (id, email, name, pass_hash, pass_salt) VALUES (?, ?, ?, ?, ?)").bind(user.id, email, name, pw.hash, pw.salt).run();
+  }
+  const done = await env.DB.prepare("UPDATE access_invites SET used_at = datetime('now'), used_by = ? WHERE token_hash = ? AND used_at IS NULL").bind(user.id, inv.token_hash).run();
+  if (!done.meta?.changes) fail(404, "Este link de acesso já foi usado.", "setup_invalid");
+  await env.DB.prepare("INSERT INTO memberships (user_id, wedding_id, role) VALUES (?, ?, ?) ON CONFLICT(user_id, wedding_id) DO UPDATE SET role = excluded.role").bind(user.id, inv.wedding_id, inv.role).run();
+  await audit(env, inv.wedding_id, "user:" + user.id, "access.setup", inv.role);
+  const raw = randomToken(32);
+  await env.DB.prepare("INSERT INTO sessions (id_hash, user_id, wedding_id, expires_at) VALUES (?, ?, ?, ?)").bind(await sha256(raw), user.id, inv.wedding_id, new Date(Date.now() + SESSION_DAYS * 864e5).toISOString()).run();
+  const secure = url.protocol === "https:" ? "; Secure" : "";
+  return json({ ok: true }, 201, { "Set-Cookie": `${secure ? COOKIE : "sess"}=${raw}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}` });
+}
+
 async function logout(req, env) {
   const raw = readCookie(req, COOKIE) || readCookie(req, "sess");
   if (raw) await env.DB.prepare("DELETE FROM sessions WHERE id_hash = ?").bind(await sha256(raw)).run();
