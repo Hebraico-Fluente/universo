@@ -2,7 +2,7 @@
    Carregado pelo painel depois de theme.css. Números ficam em Quicksand (a TrashHand não tem cifrão). */
 [data-theme="petalucas"] body{background:var(--paper)}
 [data-theme="petalucas"] .bar{background:color-mix(in srgb,var(--paper) 92%,transparent);border-bottom-color:var(--line)}
-[data-theme="petalucas"] .bar .wrap{height:76px}
+[data-theme="petalucas"] .bar .wrap{height:auto}
 [data-theme="petalucas"] .brand.logo{display:block;line-height:0}
 [data-theme="petalucas"] .brand.logo img{height:46px;width:auto}
 [data-theme="petalucas"] .tabs{gap:6px}
@@ -48,3 +48,4 @@
 [data-theme="petalucas"] .powered{margin:0;padding:24px var(--gut) 40px;text-align:center;font:600 13px/1.4 var(--sans);color:var(--muted)}
 @media (max-width:760px){[data-theme="petalucas"] .bar .wrap{height:auto}[data-theme="petalucas"] .brand.logo img{height:38px}}
 [data-theme="petalucas"] .grid3{border:0}
+[data-theme="petalucas"] .tabs{gap:2px}[data-theme="petalucas"] .tabs a{padding:9px 11px;font-size:14.5px}
