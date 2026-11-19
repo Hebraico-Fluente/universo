@@ -125,6 +125,24 @@ ok(r.status === 201, "novo lançamento com valor por convidado");
 j = await (await call("GET", "/api/admin/budget/simulate?extra=30")).json();
 ok(j.can_estimate && j.total_cents === 30 * (18500 + 4500 + 900) && j.assumptions.length >= 2 && j.lines.every(l => l.source), "simulação usa só contratos por pessoa e mostra premissas");
 
+/* ---------- controle de orçamento ---------- */
+ok((await call("POST", "/api/admin/budget/starter")).status === 409, "categorias sugeridas só quando ainda não há nenhuma");
+r = await call("POST", "/api/admin/budget/categories", { name: "Bem-casados", planned_cents: 120000 });
+const newCat = (await r.json()).id;
+ok(r.status === 201 && newCat, "cria categoria com valor planejado");
+ok((await call("PATCH", `/api/admin/budget/categories/${newCat}`, { planned_cents: 150000 })).status === 200, "edita o planejado da categoria");
+r = await call("POST", "/api/admin/budget/items", { category_id: newCat, description: "200 bem-casados", vendor: "Doceria", amount_cents: 140000, paid_cents: 0 });
+const newItem = (await r.json()).id;
+r = await call("PATCH", `/api/admin/budget/items/${newItem}`, { description: "250 bem-casados", vendor: "Doceria Flor", amount_cents: 175000, per_guest_cents: 700 });
+j = await (await call("GET", "/api/admin/budget")).json();
+let it = j.items.find(i => i.id === newItem);
+ok(r.status === 200 && it.description === "250 bem-casados" && it.vendor === "Doceria Flor" && it.per_guest_cents === 700, "edita descrição, fornecedor, valor e valor por convidado");
+ok(j.categories.find(c => c.id === newCat).planned_cents === 150000 && j.categories.find(c => c.id === newCat).committed === 175000, "categoria soma o contratado dos lançamentos");
+ok((await call("PATCH", `/api/admin/budget/items/${newItem}`, { paid_cents: 999999 })).status === 400, "pago não passa do contratado");
+ok((await call("DELETE", `/api/admin/budget/items/${newItem}`)).status === 200 && !(await (await call("GET", "/api/admin/budget")).json()).items.some(i => i.id === newItem), "apaga lançamento");
+await call("POST", "/api/admin/budget/items", { category_id: newCat, description: "Caixinhas", amount_cents: 10000 });
+ok((await call("DELETE", `/api/admin/budget/categories/${newCat}`)).status === 200 && env._db.prepare("SELECT COUNT(*) AS n FROM budget_items WHERE category_id = ?").get(newCat).n === 0, "apagar categoria apaga os lançamentos dela");
+
 /* ---------- moderação do mural ---------- */
 j = await (await call("GET", "/api/admin/recados")).json();
 const rec = j.messages.find(m => m.author === "Ana");
@@ -167,6 +185,7 @@ ok((await call("POST", "/api/admin/households/h_andrade/revoke", null, { ck: oc 
 ok((await call("PATCH", "/api/admin/budget/items/b1", { paid_cents: 0 }, { ck: oc })).status === 404, "outro casal não altera orçamento alheio");
 ok((await call("POST", `/api/admin/recados/${rec.id}/approve`, null, { ck: oc })).status === 404, "outro casal não modera recados alheios");
 ok((await call("POST", `/api/admin/presentes/${tia.id}/check`, null, { ck: oc })).status === 404 && (await (await call("GET", "/api/admin/presentes", null, { ck: oc })).json()).gifts.length === 0, "outro casal não vê nem mexe em presentes alheios");
+ok((await call("PATCH", "/api/admin/budget/categories/c_local", { planned_cents: 1 }, { ck: oc })).status === 404 && (await call("DELETE", "/api/admin/budget/items/b1", null, { ck: oc })).status === 404, "outro casal não mexe em categorias e lançamentos alheios");
 ok((await call("DELETE", "/api/admin/households/h_rossi", null, { ck: oc })).status === 404 && env._db.prepare("SELECT COUNT(*) AS n FROM households WHERE id='h_rossi'").get().n === 1, "outro casal não apaga família alheia");
 
 /* ---------- exportação ---------- */

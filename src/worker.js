@@ -26,7 +26,9 @@
  *   DELETE /api/admin/households/:id          apaga a família e as respostas
  *   GET  /api/admin/budget                    orçamento: planejado, contratado, pago, a pagar
  *   POST /api/admin/budget/items              novo lançamento
- *   PATCH /api/admin/budget/items/:id         atualiza valores pagos/contratados
+ *   PATCH /api/admin/budget/items/:id         edita o lançamento (valores, fornecedor, vencimento…)   ·   DELETE apaga
+ *   POST /api/admin/budget/categories          nova categoria   ·   PATCH|DELETE /api/admin/budget/categories/:id
+ *   POST /api/admin/budget/starter             cria as categorias sugeridas (só se ainda não houver nenhuma)
  *   GET  /api/admin/budget/simulate?extra=30  simula mais convidados com base nos contratos por pessoa
  *   GET  /api/admin/recados                   recados do mural (pendentes e aprovados)
  *   POST /api/admin/recados/:id/approve       aprova um recado   ·   DELETE /api/admin/recados/:id   apaga
@@ -124,7 +126,16 @@ async function api(req, env, url) {
     }
     if (p === "/api/admin/budget" && m === "GET") return budget(env, W);
     if (p === "/api/admin/budget/items" && m === "POST") return createItem(req, env, W);
-    if ((r = p.match(/^\/api\/admin\/budget\/items\/([\w-]{2,40})$/)) && m === "PATCH") return updateItem(req, env, W, r[1]);
+    if ((r = p.match(/^\/api\/admin\/budget\/items\/([\w-]{2,40})$/))) {
+      if (m === "PATCH") return updateItem(req, env, W, r[1]);
+      if (m === "DELETE") return deleteItem(env, W, r[1], actor);
+    }
+    if (p === "/api/admin/budget/categories" && m === "POST") return createCategory(req, env, W);
+    if (p === "/api/admin/budget/starter" && m === "POST") return starterCategories(env, W);
+    if ((r = p.match(/^\/api\/admin\/budget\/categories\/([\w-]{2,40})$/))) {
+      if (m === "PATCH") return updateCategory(req, env, W, r[1]);
+      if (m === "DELETE") return deleteCategory(env, W, r[1], actor);
+    }
     if (p === "/api/admin/budget/simulate" && m === "GET") return simulate(env, W, url);
     if (p === "/api/admin/export" && m === "GET") return exportData(env, W, actor);
     if (p === "/api/admin/recados" && m === "GET") return json({ messages: (await env.DB.prepare("SELECT id, author, message, status, created_at FROM guestbook WHERE wedding_id = ? ORDER BY status = 'pending' DESC, created_at DESC").bind(W).all()).results });
@@ -406,7 +417,7 @@ async function budgetTotals(env, W) {
   return { planned: r.planned, committed: r.committed, paid: r.paid, to_pay: r.committed - r.paid };
 }
 async function budget(env, W) {
-  const cats = (await env.DB.prepare("SELECT id, name, planned_cents FROM budget_categories WHERE wedding_id = ? ORDER BY sort").bind(W).all()).results;
+  const cats = (await env.DB.prepare("SELECT id, name, planned_cents FROM budget_categories WHERE wedding_id = ? ORDER BY sort, rowid").bind(W).all()).results;
   const items = (await env.DB.prepare("SELECT id, category_id, description, vendor, amount_cents, paid_cents, due_date, per_guest_cents FROM budget_items WHERE wedding_id = ? ORDER BY due_date IS NULL, due_date").bind(W).all()).results;
   const today = new Date().toISOString().slice(0, 10);
   return json({
@@ -436,7 +447,59 @@ async function updateItem(req, env, W, id) {
   const paid = b.paid_cents != null ? int(b.paid_cents, { field: "Pago" }) : it.paid_cents;
   if (paid > amount) fail(400, "O valor pago não pode passar do contratado", "invalid");
   const due = b.due_date !== undefined ? isoDate(b.due_date, "Vencimento") : it.due_date;
-  await env.DB.prepare("UPDATE budget_items SET amount_cents = ?, paid_cents = ?, due_date = ? WHERE id = ? AND wedding_id = ?").bind(amount, paid, due, id, W).run();
+  let cat = it.category_id;
+  if (b.category_id !== undefined && b.category_id !== it.category_id) {
+    const c = await env.DB.prepare("SELECT id FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(String(b.category_id || ""), W).first();
+    if (!c) fail(400, "Categoria inválida", "invalid");
+    cat = c.id;
+  }
+  const desc = b.description !== undefined ? str(b.description, { min: 2, max: 120, field: "Descrição" }) : it.description;
+  const vendor = b.vendor !== undefined ? str(b.vendor, { max: 80, field: "Fornecedor" }) : it.vendor;
+  const perGuest = b.per_guest_cents === undefined ? it.per_guest_cents : (b.per_guest_cents == null || b.per_guest_cents === "" ? null : int(b.per_guest_cents, { field: "Valor por convidado" }));
+  await env.DB.prepare("UPDATE budget_items SET amount_cents = ?, paid_cents = ?, due_date = ?, category_id = ?, description = ?, vendor = ?, per_guest_cents = ? WHERE id = ? AND wedding_id = ?")
+    .bind(amount, paid, due, cat, desc, vendor, perGuest, id, W).run();
+  return json({ ok: true });
+}
+async function deleteItem(env, W, id, actor) {
+  const it = await env.DB.prepare("SELECT id FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).first();
+  if (!it) fail(404, "Lançamento não encontrado", "not_found");
+  await env.DB.prepare("DELETE FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).run();
+  await audit(env, W, actor, "budget.item.delete", id);
+  return json({ ok: true });
+}
+const STARTER = ["Local", "Buffet e comida", "Bebidas", "Decoração e flores", "Foto e vídeo", "Música e som", "Trajes e beleza", "Papelaria e convites", "Lembrancinhas", "Outros"];
+async function starterCategories(env, W) {
+  const n = (await env.DB.prepare("SELECT COUNT(*) AS n FROM budget_categories WHERE wedding_id = ?").bind(W).first()).n;
+  if (n) fail(409, "Vocês já têm categorias", "exists");
+  await env.DB.batch(STARTER.map((name, i) => env.DB.prepare("INSERT INTO budget_categories (id, wedding_id, name, planned_cents, sort) VALUES (?, ?, ?, 0, ?)").bind(uid("c_"), W, name, i)));
+  return json({ ok: true, created: STARTER.length }, 201);
+}
+async function createCategory(req, env, W) {
+  const b = await body(req);
+  const name = str(b.name, { min: 2, max: 60, field: "Categoria" });
+  const planned = int(b.planned_cents ?? 0, { field: "Planejado" });
+  const sort = (await env.DB.prepare("SELECT COALESCE(MAX(sort), -1) + 1 AS s FROM budget_categories WHERE wedding_id = ?").bind(W).first()).s;
+  const id = uid("c_");
+  await env.DB.prepare("INSERT INTO budget_categories (id, wedding_id, name, planned_cents, sort) VALUES (?, ?, ?, ?, ?)").bind(id, W, name, planned, sort).run();
+  return json({ id }, 201);
+}
+async function updateCategory(req, env, W, id) {
+  const c = await env.DB.prepare("SELECT * FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(id, W).first();
+  if (!c) fail(404, "Categoria não encontrada", "not_found");
+  const b = await body(req);
+  const name = b.name !== undefined ? str(b.name, { min: 2, max: 60, field: "Categoria" }) : c.name;
+  const planned = b.planned_cents !== undefined ? int(b.planned_cents, { field: "Planejado" }) : c.planned_cents;
+  await env.DB.prepare("UPDATE budget_categories SET name = ?, planned_cents = ? WHERE id = ? AND wedding_id = ?").bind(name, planned, id, W).run();
+  return json({ ok: true });
+}
+async function deleteCategory(env, W, id, actor) {
+  const c = await env.DB.prepare("SELECT id FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(id, W).first();
+  if (!c) fail(404, "Categoria não encontrada", "not_found");
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM budget_items WHERE category_id = ? AND wedding_id = ?").bind(id, W),
+    env.DB.prepare("DELETE FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(id, W),
+  ]);
+  await audit(env, W, actor, "budget.category.delete", id);
   return json({ ok: true });
 }
 /** Simulação honesta: só usa contratos marcados com valor por pessoa. Não inventa preços. */
