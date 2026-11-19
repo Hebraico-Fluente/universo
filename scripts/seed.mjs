@@ -107,7 +107,7 @@ export async function seedSql() {
 
 /* ---------- Pétala & Lucas: casal real, identidade própria (prévia do Gueta Studio) ----------
    Textos, horários e regras copiados do site atual do casal. A família convidada abaixo é um EXEMPLO. */
-export const PETALUCAS = { token: "exemplo-petala-e-lucas-2027", login: { email: "petalucas@universo.app", password: "previa-petala-lucas-2027" } };
+export const PETALUCAS = { token: "exemplo-petala-e-lucas-2027" }; // o acesso ao painel do casal é criado à parte, nunca com senha no repositório
 async function petalucas() {
   const o = [], W = "w_petalucas", T = "/assets/themes/petalucas/";
   o.push(ins("weddings", {
@@ -148,9 +148,6 @@ async function petalucas() {
   [["Marina (exemplo)", 0], ["João (exemplo)", 1]].forEach(([n, i]) => o.push(ins("guests", { id: "g_pl_" + i, wedding_id: W, household_id: "h_pl_ex", name: n, is_child: 0, sort: i })));
   o.push(ins("invitations", { household_id: "h_pl_ex", event_id: "e_pl" }));
   o.push(ins("guestbook", { id: "m_pl_1", wedding_id: W, author: "Recado de exemplo", message: "Que venha a pista, o samba e a pizza! Amamos vocês.", status: "approved" }));
-  const pw = await hashPassword(PETALUCAS.login.password);
-  o.push(ins("users", { id: "u_pl", email: PETALUCAS.login.email, name: "Pétala & Lucas (prévia)", pass_hash: pw.hash, pass_salt: pw.salt }));
-  o.push(ins("memberships", { user_id: "u_pl", wedding_id: W, role: "owner" }));
   return o;
 }
 
