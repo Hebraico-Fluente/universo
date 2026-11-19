@@ -14,10 +14,18 @@ export const money = c => (c / 100).toLocaleString("pt-BR", { style: "currency",
 export const daysUntil = iso => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 864e5));
 
 export function countdown(el, iso) {
+  const labels = ["dias", "horas", "min", "seg"];
+  el.innerHTML = labels.map(l => `<div><b class="num"></b><small>${l}</small></div>`).join("");
+  const cells = [...el.querySelectorAll("b")];
   const tick = () => {
     let s = Math.max(0, Math.floor((new Date(iso) - Date.now()) / 1000));
     const d = Math.floor(s / 86400); s -= d * 86400; const h = Math.floor(s / 3600); s -= h * 3600; const m = Math.floor(s / 60); s -= m * 60;
-    el.innerHTML = [[d, "dias"], [h, "horas"], [m, "min"], [s, "seg"]].map(([v, l]) => `<div><b class="num">${String(v).padStart(2, "0")}</b><small>${l}</small></div>`).join("");
+    [d, h, m, s].forEach((v, i) => {
+      const t = String(v).padStart(2, "0"), b = cells[i];
+      if (b.textContent === t) return;
+      b.textContent = t;
+      b.classList.remove("tick"); void b.offsetWidth; b.classList.add("tick"); // reinicia a animação da virada
+    });
   };
   tick(); return setInterval(tick, 1000);
 }

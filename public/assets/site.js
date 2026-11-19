@@ -108,4 +108,5 @@ function render(w, events, messages, universe) {
   addEventListener("scroll", onScroll, { passive: true }); onScroll();
   requestAnimationFrame(() => document.body.classList.add("ready"));
   reveal();
+  if (w.theme) import(`/assets/themes/${w.theme}/theme.js`).then(m => m.site?.()).catch(() => {}); // animações da identidade (opcional)
 }

@@ -46,6 +46,7 @@ function open() {
   const env = $("#env");
   if (reduceMotion()) return renderInvite();
   env.classList.add("opening");
+  if (data.wedding.theme) import(`/assets/themes/${data.wedding.theme}/theme.js`).then(m => m.envelope?.(env)).catch(() => {});
   $("#open").disabled = true;
   setTimeout(renderInvite, 1700);
 }

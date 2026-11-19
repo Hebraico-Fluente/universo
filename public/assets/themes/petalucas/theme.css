@@ -90,3 +90,65 @@
 [data-theme="petalucas"] .faq summary::after{color:var(--coral)}
 [data-theme="petalucas"] .foot{text-align:center}
 [data-theme="petalucas"] .foot .wrap{justify-content:center;flex-direction:column;align-items:center}
+
+/* ===================== Animações (theme.js) ===================== */
+/* pétalas caindo */
+[data-theme="petalucas"] .petals{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+body>.petals{position:fixed;z-index:90}
+[data-theme="petalucas"] .petal{position:absolute;top:-40px;width:calc(16px * var(--s,1));height:calc(22px * var(--s,1));opacity:.85;
+  animation:petal-fall 12s linear infinite;will-change:transform}
+[data-theme="petalucas"] .petal svg{display:block;width:100%;height:100%;animation:petal-sway 3.2s ease-in-out infinite alternate}
+@keyframes petal-fall{
+  0%{transform:translate3d(0,-5vh,0) rotate(0)}
+  100%{transform:translate3d(var(--sway,60px),110vh,0) rotate(var(--spin,360deg))}
+}
+@keyframes petal-sway{from{transform:translateX(-14px) rotateY(0)}to{transform:translateX(14px) rotateY(60deg)}}
+
+/* corações do botão */
+.heart-pop{position:fixed;z-index:95;width:calc(18px * var(--s,1));height:calc(16px * var(--s,1));margin:-8px 0 0 -9px;pointer-events:none;
+  animation:heart-up 1.4s cubic-bezier(.2,.7,.3,1) forwards}
+.heart-pop svg{display:block;width:100%;height:100%}
+@keyframes heart-up{0%{opacity:0;transform:translate(0,0) scale(.3)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx,0),-120px) scale(1)}}
+
+/* logo: entra com "pop" e depois flutua de leve */
+[data-theme="petalucas"] .hero-logo{opacity:0;transform:scale(.86) rotate(-3deg)}
+[data-theme="petalucas"] .ready .hero-logo{animation:logo-in 1.1s .25s cubic-bezier(.34,1.56,.64,1) forwards,logo-float 6s 1.6s ease-in-out infinite alternate}
+@keyframes logo-in{to{opacity:1;transform:none}}
+@keyframes logo-float{from{transform:translateY(0) rotate(0)}to{transform:translateY(-8px) rotate(-1deg)}}
+[data-theme="petalucas"] .logo-names{opacity:1!important;transform:none!important}
+
+/* contagem: o número vira */
+[data-theme="petalucas"] .cd b{display:inline-block}
+[data-theme="petalucas"] .cd b.tick{animation:tick .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes tick{0%{transform:translateY(-55%) rotateX(80deg);opacity:0}100%{transform:none;opacity:1}}
+
+/* títulos aparecem como escritos à mão (da esquerda para a direita) */
+[data-theme="petalucas"] .sh.rv h2{clip-path:inset(-10% 100% -20% 0);transition:clip-path 1.3s cubic-bezier(.65,0,.35,1) .15s}
+[data-theme="petalucas"] .sh.rv.in-view h2{clip-path:inset(-10% -5% -20% 0)}
+
+/* cronograma: linha que se desenha + ícones com pulinho */
+[data-theme="petalucas"] .schedule::before{opacity:.35}
+[data-theme="petalucas"] .sch-line{position:absolute;left:50%;top:6px;bottom:6px;width:2px;margin-left:-.5px;background:var(--accent);transform-origin:top;transform:scaleY(0);z-index:0;border-radius:2px}
+@media (max-width:640px){[data-theme="petalucas"] .sch-line{left:24px}}
+[data-theme="petalucas"] .step.rv .dot{transform:scale(.4);transition:transform .6s cubic-bezier(.34,1.56,.64,1) .2s}
+[data-theme="petalucas"] .step.rv.in-view .dot{transform:none}
+
+/* cartões do traje: ícone balança ao aparecer; cartões sobem no hover */
+[data-theme="petalucas"] .dcard.in-view .dico{animation:wiggle .9s .4s ease-in-out}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}50%{transform:rotate(9deg)}75%{transform:rotate(-5deg)}}
+[data-theme="petalucas"] .dcard,[data-theme="petalucas"] .event,[data-theme="petalucas"] .gb-item{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s cubic-bezier(.22,1,.36,1)}
+@media (hover:hover){[data-theme="petalucas"] .dcard:hover,[data-theme="petalucas"] .event:hover{transform:translateY(-4px);box-shadow:0 22px 40px -28px rgba(34,58,35,.45)}}
+
+/* mapa entra levemente girado */
+[data-theme="petalucas"] .map.rv{transform:translateY(24px) rotate(1.5deg)}
+[data-theme="petalucas"] .map.rv.in-view{transform:rotate(-.6deg)}
+
+/* convite: selo pulsa antes de abrir */
+[data-theme="petalucas"] .env:not(.opening) .seal{animation:seal-pulse 2.2s ease-in-out infinite}
+@keyframes seal-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+
+@media (prefers-reduced-motion:reduce){
+  [data-theme="petalucas"] .hero-logo{opacity:1;transform:none;animation:none!important}
+  [data-theme="petalucas"] .sh.rv h2{clip-path:none}
+  [data-theme="petalucas"] .petals,.heart-pop{display:none}
+}
