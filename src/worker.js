@@ -37,6 +37,9 @@
  *   GET  /api/admin/export                    exporta todos os dados do casamento (LGPD)
  */
 import { MODS } from "./mods/index.js";
+import { householdByToken as guestsHouseholdByToken } from "./mods/convidados.js";
+import { gate as platformGate, logServerError, featuresOf } from "./mods/plataforma.js";
+import * as org from "./mods/organizacao.js"; // orçamento avançado (parcelas, histórico) e central da visão geral
 import { json, err, HttpError, fail, str, int, oneOf, isoDate, body, randomToken, uid, sha256, hashPassword, safeEqual, rateLimit, clientIp, audit, parseJson } from "./lib.js";
 
 const SESSION_DAYS = 14;
@@ -48,9 +51,10 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "same-origin",
   "X-Frame-Options": "DENY",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
   "Content-Security-Policy": [
     "default-src 'self'",
+    "media-src 'self' blob:",
     "img-src 'self' data: https://images.unsplash.com",
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
@@ -73,10 +77,19 @@ export async function runCron(env, now = new Date()) {
 }
 
 export async function handle(req, env) {
-  const url = new URL(req.url);
-  const p = url.pathname;
+  let url = new URL(req.url);
+  let p = url.pathname;
   try {
+    // plataforma: domínio próprio do casal (Host) e casamento suspenso — src/mods/plataforma.js
+    const g = await platformGate(req, env, url);
+    if (g instanceof Response) return withSecurity(g, true);
+    if (g) { req = g; url = new URL(req.url); p = url.pathname; }
     if (p.startsWith("/api/")) return await api(req, env, url);
+    // rotas fora de /api que módulos atendem diretamente (ex.: /m/:id, arquivos de mídia)
+    {
+      const rctx = { req, env, url, p, m: req.method, session: () => session(req, env), sameOrigin: () => sameOrigin(req, url) };
+      for (const mod of MODS) if (mod.raw) { const r = await mod.raw(rctx); if (r) return withSecurity(r, false); }
+    }
     // páginas com rotas amigáveis → arquivos estáticos
     let asset = null;
     if (p === "/" || p === "/index.html") asset = "/index.html";
@@ -90,6 +103,7 @@ export async function handle(req, env) {
   } catch (e) {
     if (e instanceof HttpError) return err(e.status, e.message, e.code);
     console.error(e);
+    await logServerError(env, req, e); // só rota/tipo/mensagem higienizada, sem dados pessoais
     return err(500, "Erro inesperado. Tente de novo.", "server_error");
   }
 }
@@ -122,7 +136,7 @@ async function api(req, env, url) {
     if (m === "GET") return setupInfo(req, env, r[1]);
     if (m === "POST") { sameOrigin(req, url); return setupAccess(req, env, url, r[1]); }
   }
-  if (p === "/api/me" && m === "GET") { const s = await session(req, env); return json({ user: { name: s.user_name, email: s.email }, wedding: { id: s.wedding_id, names: s.names, slug: s.slug, is_demo: !!s.is_demo, theme: s.theme || "", universe: s.universe }, role: s.role }); }
+  if (p === "/api/me" && m === "GET") { const s = await session(req, env); return json({ user: { name: s.user_name, email: s.email }, wedding: { id: s.wedding_id, names: s.names, slug: s.slug, is_demo: !!s.is_demo, theme: s.theme || "", universe: s.universe, features: await featuresOf(env, s.wedding_id) }, role: s.role }); }
 
   // área dos noivos
   if (p.startsWith("/api/admin/")) {
@@ -138,9 +152,9 @@ async function api(req, env, url) {
       if (m === "DELETE" && !r[2]) return deleteHousehold(env, W, r[1], actor);
     }
     if (p === "/api/admin/budget" && m === "GET") return budget(env, W);
-    if (p === "/api/admin/budget/items" && m === "POST") return createItem(req, env, W);
+    if (p === "/api/admin/budget/items" && m === "POST") return createItem(req, env, W, actor);
     if ((r = p.match(/^\/api\/admin\/budget\/items\/([\w-]{2,40})$/))) {
-      if (m === "PATCH") return updateItem(req, env, W, r[1]);
+      if (m === "PATCH") return updateItem(req, env, W, r[1], actor);
       if (m === "DELETE") return deleteItem(env, W, r[1], actor);
     }
     if (p === "/api/admin/budget/categories" && m === "POST") return createCategory(req, env, W);
@@ -308,10 +322,9 @@ function publicWedding(w) {
 
 /* ---------------- convite pessoal ---------------- */
 async function householdByToken(env, token) {
-  const h = await env.DB.prepare("SELECT * FROM households WHERE token_hash = ? AND revoked = 0").bind(await sha256(token)).first();
-  // token inexistente e revogado têm a mesma resposta (sem enumeração)
-  if (!h) fail(404, "Convite não encontrado. Peça um link novo aos noivos.", "invite_not_found");
-  return h;
+  // link pessoal ou acesso temporário de "confirmar pelo nome" (src/mods/convidados.js);
+  // token inexistente, vencido e revogado têm a mesma resposta (sem enumeração)
+  return guestsHouseholdByToken(env, token);
 }
 async function inviteData(req, env, token) {
   await rateLimit(env, "invite:" + clientIp(req), LIMITS.invite);
@@ -319,12 +332,12 @@ async function inviteData(req, env, token) {
   const w = await env.DB.prepare("SELECT * FROM weddings WHERE id = ?").bind(h.wedding_id).first();
   const events = (await env.DB.prepare(`SELECT e.id, e.name, e.starts_at, e.venue, e.address, e.dress_code, e.notes FROM invitations i
     JOIN events e ON e.id = i.event_id WHERE i.household_id = ? ORDER BY e.sort, e.starts_at`).bind(h.id).all()).results;
-  const guests = (await env.DB.prepare("SELECT id, name, is_child, diet, accessibility FROM guests WHERE household_id = ? ORDER BY sort").bind(h.id).all()).results;
-  const rs = (await env.DB.prepare("SELECT r.guest_id, r.event_id, r.status FROM rsvps r JOIN guests g ON g.id = r.guest_id WHERE g.household_id = ?").bind(h.id).all()).results;
+  const guests = (await env.DB.prepare("SELECT id, name, is_child, is_plus_one, diet, accessibility FROM guests WHERE household_id = ? ORDER BY sort").bind(h.id).all()).results;
+  const rs = (await env.DB.prepare("SELECT r.guest_id, r.event_id, r.status, r.menu_option_id FROM rsvps r JOIN guests g ON g.id = r.guest_id WHERE g.household_id = ?").bind(h.id).all()).results;
   return json({
     wedding: publicWedding(w),
     household: { name: h.name, greeting: h.greeting || h.name, message: h.message, max_guests: h.max_guests, note: h.note_to_couple, responded_at: h.responded_at },
-    events, guests: guests.map(g => ({ ...g, is_child: !!g.is_child })),
+    events, guests: guests.map(g => ({ ...g, is_child: !!g.is_child, is_plus_one: !!g.is_plus_one })),
     responses: rs, open: !deadlinePassed(w.rsvp_deadline),
     mods: await modsData("invite", env, w, h),
   });
@@ -341,11 +354,18 @@ async function inviteRsvp(req, env, token) {
   const events = (await env.DB.prepare("SELECT event_id FROM invitations WHERE household_id = ?").bind(h.id).all()).results.map(e => e.event_id);
   const responses = Array.isArray(b.responses) ? b.responses : fail(400, "Respostas ausentes", "invalid");
   if (responses.length === 0 || responses.length > guests.length * events.length) fail(400, "Respostas inválidas", "invalid");
+  // opções de menu dos eventos desta família (módulo convidados): a escolha só vale com "sim" e para o próprio evento
+  const menus = (await env.DB.prepare("SELECT id, event_id FROM menu_options WHERE wedding_id = ?").bind(h.wedding_id).all()).results;
   const stmts = [];
   for (const r of responses) {
     if (!guests.includes(r.guest_id) || !events.includes(r.event_id)) fail(400, "Pessoa ou evento fora deste convite", "invalid_target");
     oneOf(r.status, ["yes", "no"], "resposta");
-    stmts.push(env.DB.prepare("INSERT INTO rsvps (guest_id, event_id, status, updated_at) VALUES (?, ?, ?, datetime('now')) ON CONFLICT(guest_id, event_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at").bind(r.guest_id, r.event_id, r.status));
+    let menu = null;
+    if (r.menu != null && r.menu !== "") {
+      if (!menus.some(o => o.id === r.menu && o.event_id === r.event_id)) fail(400, "Opção de menu inválida para este evento", "invalid_menu");
+      if (r.status === "yes") menu = r.menu;
+    }
+    stmts.push(env.DB.prepare("INSERT INTO rsvps (guest_id, event_id, status, menu_option_id, updated_at) VALUES (?, ?, ?, ?, datetime('now')) ON CONFLICT(guest_id, event_id) DO UPDATE SET status = excluded.status, menu_option_id = excluded.menu_option_id, updated_at = excluded.updated_at").bind(r.guest_id, r.event_id, r.status, menu));
   }
   for (const g of Array.isArray(b.details) ? b.details : []) {
     if (!guests.includes(g.guest_id)) fail(400, "Pessoa fora deste convite", "invalid_target");
@@ -363,27 +383,35 @@ async function batch(env, stmts) { if (env.DB.batch) return env.DB.batch(stmts);
 async function overview(env, W) {
   const w = await env.DB.prepare("SELECT names, date_iso, rsvp_deadline, slug, is_demo FROM weddings WHERE id = ?").bind(W).first();
   const events = (await env.DB.prepare(`SELECT e.id, e.name, e.starts_at,
-      (SELECT COUNT(*) FROM invitations i JOIN guests g ON g.household_id = i.household_id WHERE i.event_id = e.id) AS invited,
-      (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.status = 'yes') AS yes,
-      (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.status = 'no') AS no
+      (SELECT COUNT(*) FROM invitations i JOIN guests g ON g.household_id = i.household_id JOIN households h ON h.id = i.household_id WHERE i.event_id = e.id AND h.waitlist = 0) AS invited,
+      (SELECT COUNT(*) FROM rsvps r JOIN guests g ON g.id = r.guest_id JOIN households h ON h.id = g.household_id WHERE r.event_id = e.id AND r.status = 'yes' AND h.waitlist = 0) AS yes,
+      (SELECT COUNT(*) FROM rsvps r JOIN guests g ON g.id = r.guest_id JOIN households h ON h.id = g.household_id WHERE r.event_id = e.id AND r.status = 'no' AND h.waitlist = 0) AS no
     FROM events e WHERE e.wedding_id = ? ORDER BY e.sort, e.starts_at`).bind(W).all()).results;
-  const hh = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(responded_at IS NOT NULL) AS responded FROM households WHERE wedding_id = ?").bind(W).first();
-  const diets = (await env.DB.prepare("SELECT COUNT(*) AS n FROM guests WHERE wedding_id = ? AND diet <> ''").bind(W).first()).n;
+  // lista de espera (módulo convidados) fica fora das contagens e do radar: essas famílias ainda não foram convidadas
+  const hh = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(responded_at IS NOT NULL) AS responded FROM households WHERE wedding_id = ? AND waitlist = 0").bind(W).first();
+  const diets = (await env.DB.prepare("SELECT COUNT(*) AS n FROM guests g JOIN households h ON h.id = g.household_id WHERE g.wedding_id = ? AND g.diet <> '' AND h.waitlist = 0").bind(W).first()).n;
   const b = await budgetTotals(env, W);
   const gf = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(cents), 0) AS cents, COALESCE(SUM(checked = 0), 0) AS unchecked FROM gift_notices WHERE wedding_id = ?").bind(W).first();
-  return json({ wedding: { ...w, is_demo: !!w.is_demo }, events: events.map(e => ({ ...e, pending: e.invited - e.yes - e.no })),
-    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b, gifts: gf, mods: await modsData("overview", env, W) });
+  const out = { wedding: { ...w, is_demo: !!w.is_demo }, events: events.map(e => ({ ...e, pending: e.invited - e.yes - e.no })),
+    households: { total: hh.total || 0, responded: hh.responded || 0 }, diets, budget: b, gifts: gf, mods: await modsData("overview", env, W) };
+  // central do casamento (módulo organização): progresso, urgências e radar de riscos — lê o que os outros módulos publicaram
+  out.mods.organizacao = await org.commandCenter(env, W, out, out.mods);
+  return json(out);
 }
 async function guestList(env, W) {
-  const hs = (await env.DB.prepare("SELECT id, name, greeting, max_guests, revoked, token_hash IS NOT NULL AS has_link, token_at, responded_at, note_to_couple FROM households WHERE wedding_id = ? ORDER BY created_at").bind(W).all()).results;
-  const gs = (await env.DB.prepare("SELECT id, household_id, name, is_child, diet, accessibility FROM guests WHERE wedding_id = ? ORDER BY sort").bind(W).all()).results;
+  const hs = (await env.DB.prepare("SELECT id, name, greeting, max_guests, revoked, token_hash IS NOT NULL AS has_link, token_at, responded_at, note_to_couple, waitlist, promoted_at, reminded_at FROM households WHERE wedding_id = ? ORDER BY created_at, rowid").bind(W).all()).results;
+  const gs = (await env.DB.prepare("SELECT id, household_id, name, is_child, is_plus_one, diet, accessibility FROM guests WHERE wedding_id = ? ORDER BY sort").bind(W).all()).results;
   const inv = (await env.DB.prepare("SELECT i.household_id, i.event_id FROM invitations i JOIN households h ON h.id = i.household_id WHERE h.wedding_id = ?").bind(W).all()).results;
-  const rs = (await env.DB.prepare("SELECT r.guest_id, r.event_id, r.status FROM rsvps r JOIN guests g ON g.id = r.guest_id WHERE g.wedding_id = ?").bind(W).all()).results;
+  const rs = (await env.DB.prepare("SELECT r.guest_id, r.event_id, r.status, r.menu_option_id FROM rsvps r JOIN guests g ON g.id = r.guest_id WHERE g.wedding_id = ?").bind(W).all()).results;
   const events = (await env.DB.prepare("SELECT id, name FROM events WHERE wedding_id = ? ORDER BY sort, starts_at").bind(W).all()).results;
   return json({ events, households: hs.map(h => ({
-    ...h, revoked: !!h.revoked, has_link: !!h.has_link,
+    ...h, revoked: !!h.revoked, has_link: !!h.has_link, waitlist: !!h.waitlist,
     events: inv.filter(i => i.household_id === h.id).map(i => i.event_id),
-    guests: gs.filter(g => g.household_id === h.id).map(g => ({ ...g, is_child: !!g.is_child, responses: Object.fromEntries(rs.filter(r => r.guest_id === g.id).map(r => [r.event_id, r.status])) })),
+    guests: gs.filter(g => g.household_id === h.id).map(g => {
+      const mine = rs.filter(r => r.guest_id === g.id);
+      return { ...g, is_child: !!g.is_child, is_plus_one: !!g.is_plus_one, responses: Object.fromEntries(mine.map(r => [r.event_id, r.status])),
+        menus: Object.fromEntries(mine.filter(r => r.menu_option_id).map(r => [r.event_id, r.menu_option_id])) };
+    }),
   })) });
 }
 async function issueToken(env, W, hid, url) {
@@ -400,15 +428,18 @@ async function createHousehold(req, env, W, actor, url) {
   const valid = (await env.DB.prepare("SELECT id FROM events WHERE wedding_id = ?").bind(W).all()).results.map(e => e.id);
   if (evIds.length < 1 || evIds.some(e => !valid.includes(e))) fail(400, "Escolha ao menos um evento deste casamento", "invalid");
   const id = uid("h_");
-  const stmts = [env.DB.prepare("INSERT INTO households (id, wedding_id, name, greeting, message, max_guests) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(id, W, name, str(b.greeting, { max: 80, field: "Como chamar" }), str(b.message, { max: 500, field: "Mensagem" }), people.length)];
+  // vagas extras para acompanhantes (o convidado escreve o nome no convite) e lista de espera (sem link por enquanto)
+  const extra = b.extra_slots == null || b.extra_slots === "" ? 0 : int(b.extra_slots, { min: 0, max: 20 - people.length, field: "Vagas para acompanhantes" });
+  const waitlist = b.waitlist === true;
+  const stmts = [env.DB.prepare("INSERT INTO households (id, wedding_id, name, greeting, message, max_guests, waitlist) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, W, name, str(b.greeting, { max: 80, field: "Como chamar" }), str(b.message, { max: 500, field: "Mensagem" }), people.length + extra, waitlist ? 1 : 0)];
   people.forEach((g, i) => stmts.push(env.DB.prepare("INSERT INTO guests (id, wedding_id, household_id, name, is_child, sort) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(uid("g_"), W, id, str(g.name, { min: 2, max: 80, field: "Nome do convidado" }), g.is_child ? 1 : 0, i)));
   for (const e of evIds) stmts.push(env.DB.prepare("INSERT INTO invitations (household_id, event_id) VALUES (?, ?)").bind(id, e));
   await batch(env, stmts);
-  const link = await issueToken(env, W, id, url);
+  const link = waitlist ? null : await issueToken(env, W, id, url);
   await audit(env, W, actor, "household.create", id);
-  return json({ id, link }, 201);
+  return json({ id, link, waitlist }, 201);
 }
 async function ownHousehold(env, W, hid) {
   const h = await env.DB.prepare("SELECT id FROM households WHERE id = ? AND wedding_id = ?").bind(hid, W).first();
@@ -416,6 +447,8 @@ async function ownHousehold(env, W, hid) {
 }
 async function newLink(env, W, hid, actor, url) {
   await ownHousehold(env, W, hid);
+  // gerar link para quem está na lista de espera = chamar a família (sai da lista)
+  await env.DB.prepare("UPDATE households SET waitlist = 0, promoted_at = datetime('now') WHERE id = ? AND wedding_id = ? AND waitlist = 1").bind(hid, W).run();
   const link = await issueToken(env, W, hid, url);
   await audit(env, W, actor, "household.link", hid);
   return json({ link });
@@ -441,35 +474,59 @@ async function budgetTotals(env, W) {
 }
 async function budget(env, W) {
   const cats = (await env.DB.prepare("SELECT id, name, planned_cents FROM budget_categories WHERE wedding_id = ? ORDER BY sort, rowid").bind(W).all()).results;
-  const items = (await env.DB.prepare("SELECT id, category_id, description, vendor, amount_cents, paid_cents, due_date, per_guest_cents FROM budget_items WHERE wedding_id = ? ORDER BY due_date IS NULL, due_date").bind(W).all()).results;
-  const today = new Date().toISOString().slice(0, 10);
+  const rows = (await env.DB.prepare("SELECT id, category_id, description, vendor, amount_cents, paid_cents, due_date, per_guest_cents, receipt_url FROM budget_items WHERE wedding_id = ? ORDER BY due_date IS NULL, due_date").bind(W).all()).results;
+  // parcelas, fornecedor ligado e próximos pagamentos considerando parcelas (módulo organização)
+  const { items, upcoming } = await org.budgetExtras(env, W, rows);
   return json({
     totals: await budgetTotals(env, W),
     categories: cats.map(c => { const its = items.filter(i => i.category_id === c.id); return { ...c, committed: its.reduce((s, i) => s + i.amount_cents, 0), paid: its.reduce((s, i) => s + i.paid_cents, 0) }; }),
     items,
-    upcoming: items.filter(i => i.due_date && i.amount_cents > i.paid_cents).map(i => ({ ...i, overdue: i.due_date < today })).slice(0, 8),
+    upcoming: upcoming.slice(0, 8),
   });
 }
-async function createItem(req, env, W) {
+async function createItem(req, env, W, actor) {
   const b = await body(req);
   const cat = await env.DB.prepare("SELECT id FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(String(b.category_id || ""), W).first();
   if (!cat) fail(400, "Categoria inválida", "invalid");
   const id = uid("b_");
-  const amount = int(b.amount_cents, { field: "Valor" }), paid = int(b.paid_cents ?? 0, { field: "Pago" });
+  const amount = int(b.amount_cents, { field: "Valor" });
+  let paid = int(b.paid_cents ?? 0, { field: "Pago" }), due = isoDate(b.due_date, "Vencimento");
+  const plan = org.parseInstallments(b.installments, amount); // parcelas opcionais: o pago e o vencimento passam a vir delas
+  if (plan.rows.length) { paid = plan.paid; due = plan.due; }
   if (paid > amount) fail(400, "O valor pago não pode passar do contratado", "invalid");
-  await env.DB.prepare("INSERT INTO budget_items (id, wedding_id, category_id, description, vendor, amount_cents, paid_cents, due_date, per_guest_cents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, W, cat.id, str(b.description, { min: 2, max: 120, field: "Descrição" }), str(b.vendor, { max: 80, field: "Fornecedor" }), amount, paid,
-      isoDate(b.due_date, "Vencimento"), b.per_guest_cents == null || b.per_guest_cents === "" ? null : int(b.per_guest_cents, { field: "Valor por convidado" })).run();
+  const desc = str(b.description, { min: 2, max: 120, field: "Descrição" }), vendor = str(b.vendor, { max: 80, field: "Fornecedor" });
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO budget_items (id, wedding_id, category_id, description, vendor, amount_cents, paid_cents, due_date, per_guest_cents, receipt_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, W, cat.id, desc, vendor, amount, paid, due, b.per_guest_cents == null || b.per_guest_cents === "" ? null : int(b.per_guest_cents, { field: "Valor por convidado" }),
+        receiptUrl(b.receipt_url)),
+    ...(plan.rows.length ? org.installmentStmts(env, W, id, plan.rows) : []),
+    org.historyStmt(env, W, id, desc, actor, "create", [{ field: "amount_cents", from: null, to: amount }, ...(paid ? [{ field: "paid_cents", from: null, to: paid }] : []), ...(plan.rows.length ? [{ field: "installments", from: null, to: plan.rows.length }] : [])]),
+  ]);
   return json({ id }, 201);
 }
-async function updateItem(req, env, W, id) {
+/** Comprovante: por enquanto um link (o upload de arquivos virá do módulo de mídia). */
+function receiptUrl(v) {
+  const s = str(v, { max: 500, field: "Comprovante" });
+  if (s && !/^https?:\/\/[^\s<>"']+$/i.test(s)) fail(400, "Comprovante: use um link que comece com https://", "invalid");
+  return s;
+}
+async function updateItem(req, env, W, id, actor) {
   const it = await env.DB.prepare("SELECT * FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).first();
   if (!it) fail(404, "Lançamento não encontrado", "not_found");
   const b = await body(req);
   const amount = b.amount_cents != null ? int(b.amount_cents, { field: "Valor" }) : it.amount_cents;
-  const paid = b.paid_cents != null ? int(b.paid_cents, { field: "Pago" }) : it.paid_cents;
+  let paid = b.paid_cents != null ? int(b.paid_cents, { field: "Pago" }) : it.paid_cents;
+  let due = b.due_date !== undefined ? isoDate(b.due_date, "Vencimento") : it.due_date;
+  // lançamento parcelado: pago e vencimento vêm das parcelas (enviadas junto ou já salvas)
+  const plan = b.installments !== undefined ? org.parseInstallments(b.installments, amount) : null;
+  const hadInst = await org.installmentCount(env, W, id);
+  if (plan?.rows.length) { paid = plan.paid; due = plan.due; }
+  else if (!plan && hadInst) {
+    if (amount !== it.amount_cents) fail(409, "Este lançamento é parcelado: ajuste as parcelas junto com o valor.", "installments");
+    if (paid !== it.paid_cents) fail(409, "Este lançamento é parcelado: registre o pagamento em cada parcela.", "installments");
+    due = it.due_date;
+  }
   if (paid > amount) fail(400, "O valor pago não pode passar do contratado", "invalid");
-  const due = b.due_date !== undefined ? isoDate(b.due_date, "Vencimento") : it.due_date;
   let cat = it.category_id;
   if (b.category_id !== undefined && b.category_id !== it.category_id) {
     const c = await env.DB.prepare("SELECT id FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(String(b.category_id || ""), W).first();
@@ -479,14 +536,27 @@ async function updateItem(req, env, W, id) {
   const desc = b.description !== undefined ? str(b.description, { min: 2, max: 120, field: "Descrição" }) : it.description;
   const vendor = b.vendor !== undefined ? str(b.vendor, { max: 80, field: "Fornecedor" }) : it.vendor;
   const perGuest = b.per_guest_cents === undefined ? it.per_guest_cents : (b.per_guest_cents == null || b.per_guest_cents === "" ? null : int(b.per_guest_cents, { field: "Valor por convidado" }));
-  await env.DB.prepare("UPDATE budget_items SET amount_cents = ?, paid_cents = ?, due_date = ?, category_id = ?, description = ?, vendor = ?, per_guest_cents = ? WHERE id = ? AND wedding_id = ?")
-    .bind(amount, paid, due, cat, desc, vendor, perGuest, id, W).run();
+  const receipt = b.receipt_url !== undefined ? receiptUrl(b.receipt_url) : it.receipt_url;
+  const after = { amount_cents: amount, paid_cents: paid, due_date: due, category_id: cat, description: desc, vendor, per_guest_cents: perGuest, receipt_url: receipt };
+  const changes = org.diff(it, after);
+  if (plan && (plan.rows.length || hadInst)) changes.push({ field: "installments", from: hadInst, to: plan.rows.length });
+  await env.DB.batch([
+    env.DB.prepare("UPDATE budget_items SET amount_cents = ?, paid_cents = ?, due_date = ?, category_id = ?, description = ?, vendor = ?, per_guest_cents = ?, receipt_url = ? WHERE id = ? AND wedding_id = ?")
+      .bind(amount, paid, due, cat, desc, vendor, perGuest, receipt, id, W),
+    ...(plan ? org.installmentStmts(env, W, id, plan.rows) : []),
+    ...(changes.length ? [org.historyStmt(env, W, id, desc, actor, changes.length === 1 && changes[0].field === "paid_cents" ? "pay" : "update", changes)] : []),
+  ]);
   return json({ ok: true });
 }
 async function deleteItem(env, W, id, actor) {
-  const it = await env.DB.prepare("SELECT id FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).first();
+  const it = await env.DB.prepare("SELECT id, description, amount_cents, paid_cents FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).first();
   if (!it) fail(404, "Lançamento não encontrado", "not_found");
-  await env.DB.prepare("DELETE FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W).run();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM budget_installments WHERE item_id = ? AND wedding_id = ?").bind(id, W),
+    env.DB.prepare("UPDATE vendors SET budget_item_id = NULL WHERE budget_item_id = ? AND wedding_id = ?").bind(id, W),
+    env.DB.prepare("DELETE FROM budget_items WHERE id = ? AND wedding_id = ?").bind(id, W),
+    org.historyStmt(env, W, id, it.description, actor, "delete", [{ field: "amount_cents", from: it.amount_cents, to: null }, { field: "paid_cents", from: it.paid_cents, to: null }]),
+  ]);
   await audit(env, W, actor, "budget.item.delete", id);
   return json({ ok: true });
 }
@@ -519,6 +589,8 @@ async function deleteCategory(env, W, id, actor) {
   const c = await env.DB.prepare("SELECT id FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(id, W).first();
   if (!c) fail(404, "Categoria não encontrada", "not_found");
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM budget_installments WHERE wedding_id = ? AND item_id IN (SELECT id FROM budget_items WHERE category_id = ? AND wedding_id = ?)").bind(W, id, W),
+    env.DB.prepare("UPDATE vendors SET budget_item_id = NULL WHERE wedding_id = ? AND budget_item_id IN (SELECT id FROM budget_items WHERE category_id = ? AND wedding_id = ?)").bind(W, id, W),
     env.DB.prepare("DELETE FROM budget_items WHERE category_id = ? AND wedding_id = ?").bind(id, W),
     env.DB.prepare("DELETE FROM budget_categories WHERE id = ? AND wedding_id = ?").bind(id, W),
   ]);

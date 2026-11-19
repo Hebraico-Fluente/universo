@@ -17,6 +17,7 @@ export default {
   async overview(env, W) {},   // extras da visão geral → mods[name]  (ex.: { alerts: [{ text, href }] })
   async exportData(env, W) {}, // objeto mesclado na exportação completa (LGPD)
   async cron(env, now) {},     // rotina diária (06:23 UTC)
+  async purgeGuests(env, W) {}, // limpeza LGPD: apaga dados pessoais de convidados que o módulo guarda
 };
 ```
 
@@ -42,7 +43,8 @@ O painel carrega o tema do casal (`/assets/themes/<tema>/theme.css` + `painel.cs
 (`--accent`, `--paper`, `--line`, `--r-lg`, `--serif`, `--sans`…) em vez de cores fixas.
 
 ## Site e convite
-- Site público: registre em `public/assets/site-mods/index.js` (veja o cabeçalho do arquivo).
+- Site público: registre em `public/assets/site-mods/index.js` (veja o cabeçalho do arquivo). Uma seção pode
+  entrar antes de outra (`before: "<id>"`) ou substituir uma existente (`replace: "<id>"`).
 - Convite pessoal: `public/assets/invite-mods/index.js`.
 
 ## Testes

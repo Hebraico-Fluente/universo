@@ -1,0 +1,30 @@
+/* Painel · Privacidade (módulo convidados). Só variáveis do tema. */
+.priv-v{display:grid;gap:24px}
+.priv-v .vh{margin-bottom:0}
+.pv-hero{display:grid;gap:10px;max-width:760px;padding:26px clamp(20px,3vw,32px);border-radius:var(--r-lg);border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--paper))}
+.pv-hero.done{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,var(--paper))}
+.pv-date{font:400 clamp(36px,5vw,60px)/1 var(--serif);color:var(--accent)}
+.pv-hero.done .pv-date{font-size:clamp(26px,3vw,36px);color:var(--ok)}
+.pv-msg{padding:12px 16px;border-left:3px solid var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent);max-width:760px}
+.pv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px;align-items:start}
+.pv-grid .panel{display:grid;gap:14px;align-content:start}
+.pv-grid .panel h2{margin-bottom:0}
+.pv-grid .btn{justify-self:start}
+.pv-kv{display:grid;gap:0;margin:0}
+.pv-kv div{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line)}
+.pv-kv dt{font-size:14px;color:var(--ink-2)}
+.pv-kv dd{margin:0;font:400 22px/1 var(--serif)}
+.pv-ret{display:grid;gap:10px}
+.pv-ret .in{max-width:160px}
+.pv-danger{display:grid;gap:12px;max-width:760px;padding:24px clamp(20px,3vw,30px);border:1.5px solid var(--bad);border-radius:var(--r-lg)}
+.pv-danger h2{font-size:var(--t-h3);color:var(--bad)}
+.pv-danger form{display:grid;gap:12px}
+.pv-danger .field>span{text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink-2)}
+.pv-names{color:var(--ink);font-weight:700}
+.danger-btn{justify-self:start;background:var(--bad);border-color:var(--bad);color:#fff}
+@media (hover:hover){.danger-btn:not([disabled]):hover{background:color-mix(in srgb,var(--bad) 80%,#000);border-color:var(--bad)}}
+[data-theme="petalucas"] .pv-hero{border:0;background:var(--sage);border-radius:22px}
+[data-theme="petalucas"] .pv-date,[data-theme="petalucas"] .pv-kv dd{font-family:"Quicksand",sans-serif;font-weight:700}
+[data-theme="petalucas"] .pv-danger{background:#fff;border-radius:22px}
+[data-theme="petalucas"] .pv-danger h2{font-family:"Quicksand",sans-serif;font-weight:700;font-size:24px}
+@media (max-width:520px){.danger-btn,.pv-grid .btn{justify-self:stretch}}

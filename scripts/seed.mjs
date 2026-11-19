@@ -84,6 +84,8 @@ export async function seedSql() {
 
   out.push(ins("users", { id: "u_demo", email: DEMO.login.email, name: "Helena (demonstração)", pass_hash: pw1.hash, pass_salt: pw1.salt }));
   out.push(ins("memberships", { user_id: "u_demo", wedding_id: "w_demo", role: "owner" }));
+  out.push(...await experienciasDemo()); // módulo experiências (só w_demo)
+  out.push(...organizacaoDemo());
 
   /* ---------- outros universos (para mostrar Timeless e Dreamscape e testar isolamento) ---------- */
   const others = [
@@ -103,6 +105,47 @@ export async function seedSql() {
   out.push(ins("memberships", { user_id: "u_lia", wedding_id: "w_lia", role: "owner" }));
   out.push(...await petalucas());
   return out.join("\n") + "\n";
+}
+
+/* ---------- experiências de Helena & Rafael (fictício): concierge, padrinhos, segredos, surpresa, quest, lugares ---------- */
+export const DEMO_EXP = {
+  padrinhos: { marina: "demo-padrinho-marina-2027", joao: "demo-padrinho-joao-2027" },
+  colaborador: "demo-surpresa-colaborador-2027",
+};
+async function experienciasDemo() {
+  const o = [], W = "w_demo";
+  o.push(ins("exp_settings", { wedding_id: W, flags_json: JSON.stringify({ concierge: true, documentario: true, quest: true }),
+    padrinhos_json: JSON.stringify({
+      instructions: "Cheguem às 15h30 na Villa Aurora para as fotos com os noivos. Os padrinhos entram em pares, logo depois das daminhas. Celular no silencioso durante a cerimônia, por favor.",
+      dress: "Madrinhas de vestido longo em tons de terracota (qualquer modelo). Padrinhos de terno azul-marinho, gravata da cor que quiserem.",
+      schedule: [{ time: "15h30", text: "Fotos com os noivos no jardim" }, { time: "16h10", text: "Fila de entrada, em pares" }, { time: "16h30", text: "Cerimônia" }, { time: "18h30", text: "Entrada na festa e brinde dos padrinhos" }],
+      contacts: [{ label: "Cerimonial (fictício)", value: "(41) 90000-0000" }, { label: "Helena", value: "helena@exemplo.com" }],
+    }), soundtrack_json: "{}", jornal_json: "{}" }));
+  [["ca_van", "transporte", "Vai ter transporte?", "Sim! Uma van sai do Batel às 15h45 e volta à meia-noite e às 2h. É só avisar no recado do convite que vai usar."],
+   ["ca_veg", "comida", "Tem opção vegetariana?", "Tem: o buffet terá prato principal vegetariano e opção vegana. Avise restrições no formulário do convite."]]
+    .forEach(([id, topic, question, answer], i) => o.push(ins("concierge_answers", { id, wedding_id: W, topic, question, answer, keywords: "", sort: i })));
+  o.push(ins("padrinhos", { id: "pd_marina", wedding_id: W, name: "Marina Costa", role: "madrinha", token_hash: await sha256(DEMO_EXP.padrinhos.marina), token_at: "2026-11-15 10:00:00" }));
+  o.push(ins("padrinhos", { id: "pd_joao", wedding_id: W, name: "João Lima", role: "padrinho", token_hash: await sha256(DEMO_EXP.padrinhos.joao), token_at: "2026-11-15 10:00:00" }));
+  o.push(ins("padrinho_tasks", { id: "pt_alianca", wedding_id: W, padrinho_id: "pd_joao", title: "Guardar as alianças até a cerimônia", notes: "Elas chegam na sexta, no jantar.", due_date: "2027-10-16" }));
+  o.push(ins("padrinho_tasks", { id: "pt_brinde", wedding_id: W, padrinho_id: null, title: "Ensaiar o brinde dos padrinhos (2 minutos)", notes: "", due_date: "2027-10-10" }));
+  o.push(ins("padrinho_wall", { id: "pw_1", wedding_id: W, padrinho_id: "pd_marina", message: "Gente, vamos combinar o ensaio do brinde no sábado anterior?" }));
+  o.push(ins("secret_messages", { id: "sg_andrade", wedding_id: W, household_id: "h_andrade", title: "Para a Sofia e o Theo",
+    body: "Vocês dois vão levar as alianças até o altar. A gente escolheu vocês porque sempre foram os primeiros a correr para nos abraçar. Obrigado por isso.", show_from: null }));
+  o.push(ins("surprises", { id: "sp_video", wedding_id: W, kind: "video", title: "Vídeo das amigas da faculdade", description: "Cada uma grava 20 segundos contando uma lembrança com a Helena. A Marina junta tudo.",
+    honoree_type: "casal", honoree_ref: null, honoree_label: "Helena & Rafael", reveal_at: "2027-10-16", organizer_padrinho_id: "pd_marina", created_by: "padrinho:pd_marina" }));
+  o.push(ins("surprise_members", { id: "sm_marina", wedding_id: W, surprise_id: "sp_video", name: "Marina Costa", padrinho_id: "pd_marina" }));
+  o.push(ins("surprise_members", { id: "sm_bia", wedding_id: W, surprise_id: "sp_video", name: "Bia (colaboradora)", token_hash: await sha256(DEMO_EXP.colaborador) }));
+  o.push(ins("surprise_posts", { id: "sq_1", wedding_id: W, surprise_id: "sp_video", member_id: "sm_marina", author: "Marina Costa", message: "Mandem os vídeos até o fim de setembro, na horizontal!", link: "" }));
+  [["qc_inf", "infancia", "Alguém de longa data", "Encontre alguém que conhece o casal desde a infância e peça uma história dessa época."],
+   ["qc_brinde", "brinde", "Brinde novo", "Faça um brinde com alguém que você acabou de conhecer."],
+   ["qc_pista", "pista", "Pé na pista", "Dance uma música inteira, do começo ao fim."],
+   ["qc_recado", "recado", "Deixe um carinho", "Escreva um recado para os noivos no mural do site."]]
+    .forEach(([id, kind, title, text], i) => o.push(ins("quest_challenges", { id, wedding_id: W, kind, title, text, sort: i })));
+  [["lp_livraria", "A livraria da primeira conversa", "2019", "Onde os dois disputaram o último exemplar do mesmo livro.", "Rua Augusta, São Paulo"],
+   ["lp_curitiba", "O primeiro apartamento", "2021", "A mudança para Curitiba, com o Café dormindo em cima das caixas.", "Batel, Curitiba"],
+   ["lp_pedido", "O café do pedido", "2026", "O mesmo café da primeira conversa. Ela disse sim antes de ele terminar a frase.", "Largo da Ordem, Curitiba"]]
+    .forEach(([id, name, year, text, address], i) => o.push(ins("memory_places", { id, wedding_id: W, name, year, text, address, sort: i })));
+  return o;
 }
 
 /* ---------- Pétala & Lucas: casal real, identidade própria (prévia do Gueta Studio) ----------
@@ -150,6 +193,65 @@ async function petalucas() {
   [["Marina (exemplo)", 0], ["João (exemplo)", 1]].forEach(([n, i]) => o.push(ins("guests", { id: "g_pl_" + i, wedding_id: W, household_id: "h_pl_ex", name: n, is_child: 0, sort: i })));
   o.push(ins("invitations", { household_id: "h_pl_ex", event_id: "e_pl" }));
   o.push(ins("guestbook", { id: "m_pl_1", wedding_id: W, author: "Recado de exemplo", message: "Que venha a pista, o samba e a pizza! Amamos vocês.", status: "approved" }));
+  return o;
+}
+
+/* ---------- organização do casal de DEMONSTRAÇÃO (w_demo): fornecedores, propostas, tarefas, compromissos e parcelas ----------
+   Tudo fictício (nomes com "(fictício)", contatos e links em exemplo.com). Datas relativas ao dia em que o seed é gerado,
+   para a demonstração sempre ter algo "para esta semana", um pagamento atrasado e dois compromissos no mesmo horário. */
+function organizacaoDemo() {
+  const W = "w_demo", o = [];
+  const rel = d => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + d * 864e5));
+  const V = [
+    { id: "v_villa", name: "Villa Aurora (fictício)", category: "Local", contact_name: "Renata", phone: "(41) 90000-0101", whatsapp: 1, email: "eventos@exemplo.com", site: "https://exemplo.com/villa-aurora", status: "contratado", owner: "Rafael", doc_url: "https://exemplo.com/contratos/villa-aurora.pdf", budget_item_id: "b1",
+      notes: "Montagem liberada a partir das 9h do dia. Gerador incluso.", dates: [{ label: "Visita técnica", date: rel(20) }], checklist: [{ text: "Enviar planta para a decoração", done: true }, { text: "Confirmar horário de som", done: false }] },
+    { id: "v_sabor", name: "Sabor & Cia (fictício)", category: "Buffet", contact_name: "Marcos", phone: "(41) 90000-0102", whatsapp: 1, email: "orcamentos@exemplo.com", site: "@saborecia.exemplo", status: "contratado", owner: "Helena", doc_url: "https://exemplo.com/contratos/sabor-e-cia.pdf", budget_item_id: "b2",
+      notes: "Cardápio por pessoa. Pedir opção vegana no fechamento.", dates: [{ label: "Degustação", date: rel(4) }], checklist: [{ text: "Enviar restrições alimentares", done: false }, { text: "Fechar número final", done: false }] },
+    { id: "v_mesa", name: "Mesa Posta Buffet (fictício)", category: "Buffet", contact_name: "Júlia", phone: "(41) 90000-0103", email: "contato@exemplo.com", status: "proposta_recebida", owner: "Helena", notes: "Atendimento ótimo, mas valor acima do planejado." },
+    { id: "v_serra", name: "Cozinha da Serra (fictício)", category: "Buffet", contact_name: "André", phone: "(41) 90000-0104", status: "descartado", owner: "Rafael", notes: "Não atende a data." },
+    { id: "v_luz", name: "Luz Estúdio (fictício)", category: "Foto e vídeo", contact_name: "Bruno", phone: "(41) 90000-0105", whatsapp: 1, site: "https://exemplo.com/luz-estudio", status: "contratado", owner: "Rafael", budget_item_id: "b4", notes: "Contrato assinado no papel: falta guardar o link aqui." },
+    { id: "v_jardim", name: "Ateliê Jardim (fictício)", category: "Decoração e flores", contact_name: "Lívia", phone: "(41) 90000-0106", email: "atelie@exemplo.com", status: "contratado", owner: "Helena", doc_url: "https://exemplo.com/contratos/atelie-jardim.pdf", budget_item_id: "b5" },
+    { id: "v_doce", name: "Doce Encanto (fictício)", category: "Doces e bolo", contact_name: "Carol", phone: "(41) 90000-0107", whatsapp: 1, status: "orcamento_pedido", owner: "Mãe da Helena" },
+    { id: "v_bela", name: "Studio Bela (fictício)", category: "Beleza", phone: "(41) 90000-0108", status: "pesquisando", owner: "Helena" },
+  ];
+  for (const v of V) o.push(ins("vendors", { id: v.id, wedding_id: W, name: v.name, category: v.category, contact_name: v.contact_name || "", phone: v.phone || "", whatsapp: v.whatsapp || 0, email: v.email || "",
+    site: v.site?.startsWith("@") ? "https://instagram.com/" + v.site.slice(1) : v.site || "", status: v.status, owner: v.owner || "", notes: v.notes || "", doc_url: v.doc_url || "",
+    dates_json: JSON.stringify(v.dates || []), checklist_json: JSON.stringify(v.checklist || []), budget_item_id: v.budget_item_id || null }));
+  const Q = [
+    ["q_sabor", "v_sabor", "Menu completo, 120 pessoas", 3330000, "Inclui louça, garçons e bolo de corte.", rel(-40), 1],
+    ["q_mesa", "v_mesa", "Menu completo, 120 pessoas", 3580000, "Inclui bar de caipirinhas.", rel(-35), 0],
+    ["q_serra", "v_serra", "Menu sem bebidas, 120 pessoas", 2990000, "Bebidas e louça à parte.", rel(-38), 0],
+    ["q_luz", "v_luz", "Foto + filme (10 horas)", 1250000, "Álbum 30x30 incluso.", rel(-60), 1],
+  ];
+  Q.forEach(([id, vendor_id, title, amount_cents, notes, received_at, chosen]) => o.push(ins("vendor_quotes", { id, wedding_id: W, vendor_id, title, amount_cents, notes, received_at, chosen })));
+  const T = [
+    ["Reservar o local", "Rafael", rel(-200), "done", "v_villa"],
+    ["Contratar fotografia e vídeo", "Rafael", rel(-60), "done", "v_luz"],
+    ["Enviar o save the date", "Helena", rel(-5), "todo", null],
+    ["Escolher o cardápio para a degustação", "Rafael", rel(3), "doing", "v_sabor"],
+    ["Pedir orçamento de doces e bolo", "Mãe da Helena", rel(5), "todo", "v_doce"],
+    ["Guardar o contrato da fotografia no painel", "", rel(6), "todo", "v_luz"],
+    ["Montar a playlist da cerimônia", "", rel(40), "todo", null],
+    ["Encomendar convites e papelaria", "Helena", rel(70), "todo", null],
+    ["Comprar as alianças", "Rafael", rel(150), "todo", null],
+    ["Agendar teste de cabelo e maquiagem", "Helena", rel(200), "todo", "v_bela"],
+  ];
+  T.forEach(([title, owner, due_date, status, vendor_id], i) => o.push(ins("tasks", { id: "t_demo_" + i, wedding_id: W, title, owner, due_date, status, done_at: status === "done" ? due_date : null, vendor_id })));
+  const A = [
+    ["a_degust", "Degustação do buffet", "degustacao", rel(4) + "T19:00", 90, "Sabor & Cia (fictício), Batel", "v_sabor"],
+    ["a_prova", "Primeira prova do vestido", "prova", rel(9) + "T10:00", 60, "Ateliê de noivas (fictício)", null],
+    ["a_flores", "Reunião sobre flores e cenografia", "reuniao", rel(9) + "T10:30", 60, "Ateliê Jardim (fictício)", "v_jardim"],
+    ["a_visita", "Visita técnica com o cerimonial", "visita", rel(20) + "T15:00", 120, "Villa Aurora (fictício)", "v_villa"],
+  ];
+  A.forEach(([id, title, kind, starts_at, duration_min, place, vendor_id]) => o.push(ins("appointments", { id, wedding_id: W, title, kind, starts_at, duration_min, place, vendor_id })));
+  // parcelas: buffet (sinal pago + 3 parcelas) e foto (uma parcela já atrasada, para o radar de riscos)
+  const P = [["b2", 999000, rel(-90), rel(-90)], ["b2", 777000, "2027-02-05", null], ["b2", 777000, "2027-05-05", null], ["b2", 777000, "2027-08-05", null],
+    ["b4", 625000, rel(-60), rel(-60)], ["b4", 312500, rel(-6), null], ["b4", 312500, "2027-08-01", null]];
+  const n = {};
+  P.forEach(([item_id, amount_cents, due_date, paid_at], i) => { n[item_id] = (n[item_id] || 0) + 1; o.push(ins("budget_installments", { id: "p_demo_" + i, wedding_id: W, item_id, n: n[item_id], amount_cents, due_date, paid_at })); });
+  o.push(`UPDATE budget_items SET due_date = ${q(rel(-6))} WHERE id = 'b4' AND wedding_id = 'w_demo';`);
+  o.push(ins("budget_history", { wedding_id: W, item_id: "b2", item_label: "Buffet completo", actor: "user:u_demo", action: "installments", changes_json: JSON.stringify([{ field: "installments", from: 0, to: 4 }]), at: rel(-90) + " 14:20:00" }));
+  o.push(ins("budget_history", { wedding_id: W, item_id: "b4", item_label: "Fotografia + filme", actor: "user:u_demo", action: "pay", changes_json: JSON.stringify([{ field: "installment", from: null, to: 1 }, { field: "paid_cents", from: 0, to: 625000 }]), at: rel(-60) + " 10:05:00" }));
   return o;
 }
 

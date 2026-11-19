@@ -1,0 +1,28 @@
+name: Criar administrador da plataforma
+# Recebe só o HASH do link (gerado localmente com scripts/platform-link.mjs). O link em si nunca passa por aqui.
+# Quem abrir o link escolhe nome, e-mail e senha e vira administrador da plataforma (/plataforma). Uso único.
+on:
+  workflow_dispatch:
+    inputs:
+      token_hash: { description: "Hash do link (44 caracteres)", required: true }
+      dias: { description: "Validade em dias (1 a 7)", required: true, default: "2" }
+jobs:
+  criar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Validar entradas
+        env: { HASH: "${{ inputs.token_hash }}", DIAS: "${{ inputs.dias }}" }
+        run: |
+          echo "$HASH" | grep -Eq '^[A-Za-z0-9+/]{43}=$' || { echo "::error::hash inválido (use o token_hash de scripts/platform-link.mjs, nunca o link)"; exit 1; }
+          echo "$DIAS" | grep -Eq '^[1-7]$' || { echo "::error::dias inválido (1 a 7)"; exit 1; }
+      - name: Gravar convite de administrador
+        env:
+          CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          HASH: "${{ inputs.token_hash }}"
+          DIAS: "${{ inputs.dias }}"
+        run: |
+          SQL="INSERT INTO platform_invites (token_hash, expires_at) VALUES ('$HASH', strftime('%Y-%m-%dT%H:%M:%fZ','now','+$DIAS days'));"
+          out=$(npx -y wrangler@4 d1 execute universo --remote --json --command "$SQL")
+          echo "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s)[0].meta.changes;console.log("linhas gravadas:",n);if(n!==1){console.log("::error::convite não gravado");process.exit(1)}})'

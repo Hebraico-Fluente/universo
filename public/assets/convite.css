@@ -43,23 +43,6 @@
 .rsvp{max-width:860px;padding-top:clamp(56px,8vw,96px)}
 .rsvp h2{font-size:var(--t-h2)}
 .rsvp header{display:grid;gap:10px;margin-bottom:26px}
-form{display:grid;gap:18px}
-.person{margin:0;padding:22px clamp(16px,3vw,28px);border:1px solid var(--line);border-radius:var(--r-lg)}
-.person legend{display:flex;align-items:center;gap:10px;padding:0 8px;margin-left:-8px}
-.pname{font:400 24px/1.1 var(--serif)}
-.row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px dashed var(--line)}
-.row:last-of-type{border-bottom:0}
-.ename{font-weight:500}
-@media (max-width:520px){.row{flex-direction:column;align-items:stretch}.seg{grid-auto-columns:1fr}.seg span{min-width:0}}
-.more{margin-top:10px}
-.more summary{cursor:pointer;padding:10px 0;font-size:14px;font-weight:500}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:6px 0 4px}
-@media (max-width:560px){.grid2{grid-template-columns:1fr}}
-.priv{font-size:13px;color:var(--muted)}
-form .btn{justify-self:start;min-width:240px}
-.done{display:grid;gap:12px;padding:40px 0}
-.done h2{font-size:var(--t-h2)}
-.done[hidden],form[hidden]{display:none}
 .inv-foot{display:flex;flex-wrap:wrap;gap:12px;max-width:860px;padding-top:56px}
 
 [data-universe="dreamscape"] .env-front,[data-universe="dreamscape"] .env-back,[data-universe="dreamscape"] .env-flap{filter:brightness(.92)}
@@ -77,9 +60,16 @@ form .btn{justify-self:start;min-width:240px}
 [data-theme="petalucas"] .msg{margin-inline:auto;font:500 clamp(18px,2vw,22px)/1.55 var(--sans);font-style:normal}
 [data-theme="petalucas"] .msg::before{color:var(--coral);font-family:"TrashHand",cursive}
 [data-theme="petalucas"] .ev .i{font:400 30px/1 "TrashHand",cursive;color:var(--coral)}
-[data-theme="petalucas"] .ev h3,[data-theme="petalucas"] .pname,[data-theme="petalucas"] .rsvp h2,[data-theme="petalucas"] .done h2{font-family:"TrashHand",cursive;color:var(--accent)}
-[data-theme="petalucas"] .person{background:#fff;border-radius:var(--r-lg)}
-[data-theme="petalucas"] .seg{border-radius:999px}
-[data-theme="petalucas"] .seg input:checked+span{background:var(--accent);color:#fff}
+[data-theme="petalucas"] .ev h3,[data-theme="petalucas"] .rsvp h2{font-family:"TrashHand",cursive;color:var(--accent)}
 .rule-note{padding:16px 18px;border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
 [data-theme="petalucas"] .rule-note{border-left:0;border-radius:18px;background:var(--sage);color:var(--ink)}
+
+/* mesa da família (quando o casal libera) */
+.inv-table{max-width:860px;padding-top:clamp(36px,5vw,56px)}
+.tb-card{display:grid;gap:8px;padding:22px clamp(18px,3vw,28px);border:1px solid var(--accent);border-radius:var(--r-lg);background:color-mix(in srgb,var(--accent) 6%,var(--paper))}
+.tb-name{font:400 clamp(28px,4vw,40px)/1.1 var(--serif);color:var(--accent)}
+.tb-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.tb-list li{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.tb-list b{font-weight:600;color:var(--accent)}
+[data-theme="petalucas"] .tb-card{border:0;background:var(--sage);border-radius:var(--r-lg)}
+[data-theme="petalucas"] .tb-name{font-family:"TrashHand",cursive}

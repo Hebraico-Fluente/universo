@@ -1,0 +1,38 @@
+/* Formulário de RSVP compartilhado (convite pessoal e "confirmar pelo nome" no site). Usa só variáveis do tema. */
+.rsvpf form{display:grid;gap:18px}
+.rsvpf form[hidden],.rsvpf .done[hidden],.rsvpf [hidden]{display:none}
+.rsvpf .person{margin:0;padding:22px clamp(16px,3vw,28px);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper);min-width:0}
+.rsvpf .person.plus{border-style:dashed}
+.rsvpf .person legend{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0 8px;margin-left:-8px}
+.rsvpf .pname{font:400 24px/1.1 var(--serif)}
+.rsvpf .rm-plus{display:inline-flex;align-items:center;min-height:44px;margin-top:-6px;font-size:14px;color:var(--bad)}
+.rsvpf .row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.rsvpf .ename{font-weight:500}
+.rsvpf .menu-pick{padding:4px 0 12px;border-bottom:1px dashed var(--line)}
+.rsvpf .menu-pick>span{text-transform:none;letter-spacing:.02em;font-size:13px}
+.rsvpf .more{margin-top:10px}
+.rsvpf .more summary{cursor:pointer;padding:12px 0;font-size:14px;font-weight:500;min-height:44px}
+.rsvpf .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:6px 0 4px}
+.rsvpf .plus-add{display:grid;gap:10px;padding:18px clamp(16px,3vw,24px);border-radius:var(--r-lg);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.rsvpf .pa-row{display:flex;gap:10px}
+.rsvpf .pa-row .in{flex:1;min-width:0}
+.rsvpf .pa-row .btn{flex:none}
+.rsvpf .priv{font-size:13px;color:var(--muted)}
+.rsvpf .rf-send{justify-self:start;min-width:240px}
+.rsvpf .done{display:grid;gap:12px;padding:30px 0;justify-items:start}
+.rsvpf .done h2{font-size:var(--t-h2)}
+.rsvpf .rf-edit{min-height:44px}
+.rsvpf .small{font-size:13px}
+@media (max-width:560px){
+  .rsvpf .grid2{grid-template-columns:1fr}
+  .rsvpf .row{flex-direction:column;align-items:stretch}
+  .rsvpf .seg{grid-auto-columns:1fr}.rsvpf .seg span{min-width:0}
+  .rsvpf .pa-row{flex-direction:column}
+  .rsvpf .rf-send{justify-self:stretch;min-width:0}
+}
+[data-theme="petalucas"] .rsvpf .pname,[data-theme="petalucas"] .rsvpf .done h2{font-family:"TrashHand",cursive;color:var(--accent)}
+[data-theme="petalucas"] .rsvpf .person{background:#fff}
+[data-theme="petalucas"] .rsvpf .seg{border-radius:999px}
+[data-theme="petalucas"] .rsvpf .seg input:checked+span{background:var(--accent);color:#fff}
+[data-theme="petalucas"] .rsvpf .plus-add{background:var(--sage)}
+[data-theme="petalucas"] .rsvpf .in{border-radius:16px;background:#fff}

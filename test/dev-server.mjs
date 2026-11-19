@@ -10,6 +10,11 @@ if (process.env.DEV_ACCESS_TOKEN) {
   const { sha256 } = await import("../src/lib.js");
   env._db.prepare("INSERT INTO access_invites (token_hash, wedding_id, role, expires_at) VALUES (?, 'w_petalucas', 'owner', ?)").run(await sha256(process.env.DEV_ACCESS_TOKEN), new Date(Date.now() + 864e5).toISOString());
 }
+// convite de administrador da plataforma (só local): DEV_PLATFORM_TOKEN=... npm run dev  →  /plataforma?convite=...
+if (process.env.DEV_PLATFORM_TOKEN) {
+  const { sha256 } = await import("../src/lib.js");
+  env._db.prepare("INSERT INTO platform_invites (token_hash, expires_at) VALUES (?, ?)").run(await sha256(process.env.DEV_PLATFORM_TOKEN), new Date(Date.now() + 864e5).toISOString());
+}
 http.createServer(async (req, res) => {
   // só local: roda a rotina diária na hora (GET /__cron?agora=2027-06-01)
   if (req.url.startsWith("/__cron")) { const q = new URL(req.url, "http://x").searchParams.get("agora"); await runCron(env, q ? new Date(q) : new Date()); res.end("cron ok"); return; }

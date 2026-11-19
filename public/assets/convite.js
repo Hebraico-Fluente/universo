@@ -1,6 +1,7 @@
 /** Convite pessoal: /i/:token  — envelope, mensagem, eventos da família e RSVP por pessoa e por evento. */
 import { $, $$, esc, longDate, time, api, mapsLink, reduceMotion } from "./ui.js";
 import { INVITE_MODS } from "./invite-mods/index.js";
+import { mountRsvp, loadCss } from "./invite-mods/rsvp-form.js";
 
 const token = location.pathname.split("/")[2];
 const app = $("#app");
@@ -52,10 +53,21 @@ function open() {
   setTimeout(renderInvite, 1700);
 }
 
-function renderInvite(scrollTo) {
-  const { wedding: w, household: h, events, guests, responses, open: isOpen } = data;
-  const resp = (g, e) => responses.find(r => r.guest_id === g && r.event_id === e)?.status || "";
-  const answered = responses.length > 0;
+/** Mesa da família, quando o casal liberou ("mostrar mesas aos convidados"). */
+function tableLine() {
+  const t = data.mods?.convidados?.tables; if (!t || !t.length) return "";
+  const byGuest = Object.fromEntries(t.map(x => [x.guest_id, x.table_name]));
+  const seated = data.guests.filter(g => byGuest[g.id]);
+  const names = [...new Set(seated.map(g => byGuest[g.id]))];
+  return `<section class="wrap inv-table rv" aria-labelledby="tb-t"><div class="tb-card">
+    <p class="label" id="tb-t">${names.length === 1 ? "Sua mesa" : "Suas mesas"}</p>
+    ${names.length === 1 ? `<p class="tb-name">${esc(names[0])}</p>` : `<ul class="tb-list">${seated.map(g => `<li><span>${esc(g.name)}</span><b>${esc(byGuest[g.id])}</b></li>`).join("")}</ul>`}
+  </div></section>`;
+}
+
+async function renderInvite() {
+  const { wedding: w, household: h, events, responses, open: isOpen } = data;
+  await loadCss();
   app.innerHTML = `
   <article class="invite">
     <header class="inv-head wrap rv">
@@ -75,30 +87,13 @@ function renderInvite(scrollTo) {
       </li>`).join("")}</ol>
     </section>
 
+    ${tableLine()}
+
     <section class="wrap rsvp" id="rsvp" aria-labelledby="rsvp-t">
-      <header class="rv"><h2 id="rsvp-t">${answered ? "Suas respostas" : "Vocês vêm?"}</h2>
+      <header class="rv"><h2 id="rsvp-t">${responses.length ? "Suas respostas" : "Vocês vêm?"}</h2>
         ${w.rsvp_note ? `<p class="rule-note">${esc(w.rsvp_note)}</p>` : ""}
         <p class="muted">${isOpen ? `Responda até ${esc(longDate(w.rsvp_deadline + "T12:00:00-03:00"))}. Dá para mudar depois, até o prazo.` : "O prazo de confirmação terminou. Para mudar algo, fale direto com os noivos."}</p></header>
-      <form id="form" class="rv" novalidate>
-        ${guests.map(g => `<fieldset class="person">
-          <legend><span class="pname">${esc(g.name)}</span>${g.is_child ? `<span class="tag no">criança</span>` : ""}</legend>
-          ${events.map(e => `<div class="row"><span class="ename">${esc(e.name)}</span>
-            <div class="seg" role="radiogroup" aria-label="${esc(g.name)} · ${esc(e.name)}">
-              <label><input type="radio" name="r_${g.id}_${e.id}" value="yes" ${resp(g.id, e.id) === "yes" ? "checked" : ""} ${isOpen ? "" : "disabled"}><span>Vou</span></label>
-              <label><input type="radio" name="r_${g.id}_${e.id}" value="no" ${resp(g.id, e.id) === "no" ? "checked" : ""} ${isOpen ? "" : "disabled"}><span>Não vou</span></label>
-            </div></div>`).join("")}
-          <details class="more"${g.diet || g.accessibility ? " open" : ""}><summary>Restrição alimentar ou acessibilidade <span class="muted">(opcional)</span></summary>
-            <div class="grid2">
-              <label class="field"><span>Restrição alimentar</span><input class="in" name="diet_${g.id}" maxlength="160" value="${esc(g.diet)}" placeholder="Ex.: vegetariana, sem glúten" ${isOpen ? "" : "disabled"}></label>
-              <label class="field"><span>Acessibilidade</span><input class="in" name="acc_${g.id}" maxlength="160" value="${esc(g.accessibility)}" placeholder="Ex.: cadeira de rodas" ${isOpen ? "" : "disabled"}></label>
-            </div></details>
-        </fieldset>`).join("")}
-        <label class="field note"><span>Recado para os noivos <span class="muted">(opcional)</span></span><textarea class="in" name="note" rows="3" maxlength="600" ${isOpen ? "" : "disabled"}>${esc(h.note)}</textarea></label>
-        <p class="priv">🔒 Seus dados servem só para organizar o casamento, ficam visíveis apenas para os noivos e são apagados depois da festa.</p>
-        <p class="error" id="err" role="alert"></p>
-        ${isOpen ? `<button class="btn accent" type="submit" id="send">${answered ? "Atualizar respostas" : "Enviar confirmação"}</button>` : ""}
-      </form>
-      <div class="done" id="done" hidden tabindex="-1"><p class="label">Recebido</p><h2 id="doneT"></h2><p class="muted">Você pode voltar a este link para mudar as respostas até o prazo.</p><button class="link" type="button" id="edit">Ver ou alterar respostas</button></div>
+      <div id="rsvpForm" class="rv"></div>
     </section>
 
     <div id="invMods"></div>
@@ -110,37 +105,7 @@ function renderInvite(scrollTo) {
   ${w.is_demo ? `<p class="demo" role="note">Convite fictício de demonstração · <a href="/">conheça o Universo</a></p>` : ""}`;
 
   $("#share").href = "https://wa.me/?text=" + encodeURIComponent(`Nosso convite para o casamento de ${w.names}. Este link é só da nossa família: ${location.href}`);
-  $("#form").addEventListener("submit", submit);
-  $("#edit").addEventListener("click", () => { $("#done").hidden = true; $("#form").hidden = false; });
+  mountRsvp($("#rsvpForm"), { token, data, onData: d => { data = d; $("#rsvp-t").textContent = d.responses.length ? "Suas respostas" : "Vocês vêm?"; } });
   for (const l of INVITE_MODS) l().then(m => m.init?.({ data, mods: data.mods || {}, root: $("#invMods"), token, api, esc })).catch(e => console.error(e));
   import("./ui.js").then(m => m.reveal());
-  if (scrollTo) $(scrollTo)?.scrollIntoView();
-}
-
-async function submit(e) {
-  e.preventDefault();
-  const f = e.target, err = $("#err");
-  err.textContent = "";
-  const responses = [], details = [];
-  for (const g of data.guests) {
-    for (const ev of data.events) {
-      const v = f[`r_${g.id}_${ev.id}`]?.value;
-      if (v) responses.push({ guest_id: g.id, event_id: ev.id, status: v });
-    }
-    details.push({ guest_id: g.id, diet: f[`diet_${g.id}`].value, accessibility: f[`acc_${g.id}`].value });
-  }
-  const missing = data.guests.length * data.events.length - responses.length;
-  if (missing > 0) { err.textContent = `Falta responder ${missing} ${missing > 1 ? "itens" : "item"}. Marque “Vou” ou “Não vou” em cada evento.`; return; }
-  const btn = $("#send"); btn.disabled = true; btn.textContent = "Enviando…";
-  try {
-    await api(`/api/invite/${token}/rsvp`, { method: "POST", body: { responses, details, note: f.note.value } });
-    data = await api(`/api/invite/${token}`);
-    const yes = responses.filter(r => r.status === "yes").length;
-    renderInvite();
-    $("#form").hidden = true; const done = $("#done"); done.hidden = false;
-    $("#doneT").textContent = yes ? "Que alegria! Está confirmado." : "Que pena. Obrigado por avisar.";
-    done.scrollIntoView({ block: "center" }); done.focus({ preventScroll: true });
-  } catch (x) {
-    err.textContent = x.message; btn.disabled = false; btn.textContent = "Tentar de novo";
-  }
 }

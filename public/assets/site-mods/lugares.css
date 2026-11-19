@@ -1,0 +1,19 @@
+/* "Nossos lugares": rota pontilhada com cartões alternados (sem mapas externos) */
+.lg-route{--line-x:50%;position:relative;list-style:none;margin:0 auto;padding:0;max-width:980px;display:grid;gap:clamp(28px,4vw,48px)}
+.lg-route::before{content:"";position:absolute;top:10px;bottom:10px;left:var(--line-x);width:0;border-left:2px dashed color-mix(in srgb,var(--accent) 45%,transparent);transform:translateX(-1px)}
+.lg-stop{position:relative;display:grid;grid-template-columns:1fr 56px 1fr;align-items:center}
+.lg-pin{grid-column:2;justify-self:center;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--paper);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent);box-shadow:0 0 0 6px var(--paper);z-index:1}
+.lg-pin svg{width:22px;height:22px}
+.lg-card{grid-column:1;grid-row:1;display:grid;gap:8px;padding:clamp(20px,2.6vw,30px);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper);box-shadow:0 22px 40px -34px rgba(0,0,0,.45);text-align:right;justify-items:end}
+.lg-stop:nth-child(even) .lg-card{grid-column:3;text-align:left;justify-items:start}
+.lg-yr{font:400 clamp(30px,3.4vw,44px)/1 var(--serif);color:var(--accent)}
+.lg-card h3{font-size:var(--t-h3);line-height:1.15}
+.lg-txt{color:var(--ink-2);max-width:30em}
+.lg-addr{font-size:14px;color:var(--muted)}
+.lg-map{font:600 14px/1 var(--sans);color:var(--accent);text-underline-offset:4px;padding:8px 0}
+@media (max-width:720px){
+  .lg-route{--line-x:23px}
+  .lg-stop{grid-template-columns:46px 1fr;gap:16px;align-items:start}
+  .lg-pin{grid-column:1}
+  .lg-card,.lg-stop:nth-child(even) .lg-card{grid-column:2;text-align:left;justify-items:start}
+}

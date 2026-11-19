@@ -1,0 +1,25 @@
+/* Widget "Ajuda" do painel (chamados de suporte). Usa as variáveis do tema do casal. */
+.aj-btn{position:relative;text-decoration:none;color:var(--muted)}
+.aj-btn.news{color:var(--ink)}
+.aj-btn.news::after{content:"";position:absolute;top:-2px;right:-9px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+@media (hover:hover){.aj-btn:hover{color:var(--ink);text-decoration:underline}}
+.aj{width:min(620px,calc(100vw - 24px));max-height:min(86vh,900px);padding:0;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.18)}
+.aj::backdrop{background:rgba(20,18,16,.38)}
+.aj-in{display:grid;gap:16px;padding:clamp(20px,4vw,32px)}
+.aj-h{display:flex;justify-content:space-between;align-items:start;gap:16px}
+.aj-h h2{font-size:var(--t-h3);margin-top:8px;outline:none}
+.aj-x{font-size:14px}
+.aj-f{display:grid;gap:12px}
+.aj-f .btn{justify-self:start}
+.aj-ta{min-height:96px;resize:vertical;line-height:1.5}
+.aj-h3{font:600 var(--t-label)/1.2 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+.aj-list{list-style:none;margin:0;padding:0;display:grid}
+.aj-list>li{border-bottom:1px solid var(--line)}
+.aj-list summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;cursor:pointer;list-style:none;min-height:44px}
+.aj-list summary::-webkit-details-marker{display:none}
+.aj-s{font:400 19px/1.2 var(--serif)}
+.aj-thread{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:10px}
+.aj-thread li{padding:12px 14px;border:1px solid var(--line);display:grid;gap:6px}
+.aj-thread li.us{border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.aj-msg{white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
+.aj-reply{margin-bottom:16px}

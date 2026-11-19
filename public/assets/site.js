@@ -56,7 +56,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
   const schedule = w.schedule.length ? `<ol class="schedule">${w.schedule.map(s => `<li class="step rv"><span class="t num">${esc(s.time)}</span><span class="dot">${icon(s.icon)}</span><div><h3>${esc(s.title)}</h3><p>${esc(s.text)}</p></div></li>`).join("")}</ol>` : "";
   html.push(sec("dia", "O grande dia", "Onde e <em>quando</em>", `<div class="day${map ? " with-map" : ""}"><div class="events">${ev}</div>${map}</div>${schedule ? `<h3 class="sub rv">Cronograma da festa</h3>${schedule}` : ""}`, "alt"));
 
-  if (w.dress.length) html.push(sec("traje", "Traje", "Esporte fino, <em>pronto para a pista</em>",
+  if (w.dress.length) html.push(sec("traje", "Traje", (THEME_TEXT[w.theme] || {}).dress || "O que <em>vestir</em>",
     `<div class="dresses">${w.dress.map(d => `<article class="dcard rv"><span class="dico">${icon(d.icon)}</span><h3>${esc(d.title)}</h3><p>${esc(d.text)}</p></article>`).join("")}</div>`));
 
   html.push(sec("presenca", "Presença", "Confirme pelo <em>seu convite</em>",
@@ -82,6 +82,8 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
     `<div class="faq rv">${w.faq.map(f => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join("")}</div>`));
 
   for (const m of loaded) for (const x of m.sections?.({ w, data: mods[m.name], esc, icon, money, longDate }) || []) {
+    const rep = x.replace ? html.findIndex(h => h.id === x.replace) : -1; // replace: id → troca uma seção existente
+    if (rep >= 0) { html[rep] = x; continue; }
     const at = x.before ? html.findIndex(h => h.id === x.before) : -1;
     html.splice(at < 0 ? html.length : at, 0, x);
   }
@@ -200,10 +202,15 @@ function parseCents(v) {
 }
 
 /** Quiz "Quanto você conhece o casal?" — uma pergunta por vez, com a curiosidade depois de cada resposta. */
+/** Frases escritas para a identidade de um casal específico (os demais recebem textos genéricos). */
+const THEME_TEXT = {
+  petalucas: { dress: "Esporte fino, <em>pronto para a pista</em>", quizMid: "Conhece bem o casal. Na festa, puxa a conversa sobre o Djavan." },
+};
+
 function quiz(box, w) {
   const Q = w.quiz; let i = 0, score = 0;
   const band = n => n === Q.length ? ["Testemunha oficial dessa história!", "Você sabe tudo. Já pode contar essa história no brinde."]
-    : n >= Q.length - 2 ? ["Quase da família!", "Conhece bem o casal. Na festa, puxa a conversa sobre o Djavan."]
+    : n >= Q.length - 2 ? ["Quase da família!", (THEME_TEXT[w.theme] || {}).quizMid || "Conhece bem o casal. Na festa, puxa assunto sobre essa história."]
     : ["Vem com a gente na pista!", "Ainda dá tempo de conhecer melhor: senta perto deles e pede a história completa."];
   const draw = () => {
     if (i >= Q.length) {

@@ -1,0 +1,148 @@
+/* Plataforma (Gueta Studio) — sobre ds.css + painel.css, universo editorial. Sóbrio: linhas finas, serifa nos títulos. */
+
+/* entrada */
+.pf-login{min-height:100svh;display:grid;place-items:center;padding:clamp(20px,6vw,72px) var(--gut);background:linear-gradient(180deg,var(--paper) 0%,var(--paper-2) 100%)}
+.pf-login-box{width:min(460px,100%);display:grid;gap:18px;padding:clamp(28px,5vw,48px);border:1px solid var(--line);background:var(--paper)}
+.pf-login-box h1{font-size:clamp(38px,5vw,56px);line-height:1}
+.pf-login-box form{display:grid;gap:16px;margin-top:6px}
+.pf-login-box form .btn{justify-self:start;min-width:160px}
+.pf-login-box .hint{padding-top:16px;border-top:1px solid var(--line)}
+
+/* barra */
+.pf .brand{white-space:nowrap}
+.pf-sub{font:600 11px/1 var(--sans);font-style:normal;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-left:6px;vertical-align:middle}
+.pf-me{max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf .tabs{overflow-x:auto;scrollbar-width:none}
+.pf .tabs a{white-space:nowrap}
+@media (max-width:760px){.pf-me{display:none}}
+#view:focus{outline:none}
+
+/* avisos e mensagens */
+.pf-note{margin:0 0 22px;padding:14px 18px;border-left:2px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);font-size:15px}
+.pf-note.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+.pf-bad{color:var(--bad)}
+.pf-toast{position:fixed;left:50%;bottom:24px;z-index:30;max-width:min(560px,calc(100vw - 32px));margin:0;padding:12px 18px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--paper);font-size:14px;transition:opacity .25s var(--ease),transform .25s var(--ease)}
+.pf-toast.on{opacity:1;transform:translate(-50%,0)}
+.pf-toast.bad{background:var(--bad)}
+@media (prefers-reduced-motion:reduce){.pf-toast{transition:none}}
+
+/* seções */
+.pf-sec{margin:clamp(30px,4vw,48px) 0}
+.pf-sec>h2,.pf-vh2 h2{font-size:var(--t-h3);margin-bottom:14px}
+.pf-vh2{margin-bottom:12px;align-items:center}
+.pf-h3{font:600 var(--t-label)/1.2 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.vh .row-btns{justify-content:flex-end}
+.vh .muted{margin-top:8px}
+.kv dd small{font:400 13px/1 var(--sans)}
+.split>.panel{min-width:0}
+
+/* formulários */
+.pf-form{display:grid;gap:18px;margin-bottom:28px}
+.pf-form[hidden]{display:none}
+.pf-form h2{font-size:var(--t-h3);margin:0}
+.pf-form>.btn,.pf-form>.row-btns{justify-self:start}
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px 20px}
+.pf-span2{grid-column:span 2}
+@media (max-width:560px){.pf-span2{grid-column:auto}}
+.pf-inline{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-top:18px}
+.pf-inline .field{flex:1 1 160px}
+.pf-inline .btn{min-height:48px}
+.pf-check{display:flex;gap:10px;align-items:center;min-height:40px;font-size:15px;cursor:pointer}
+.pf-check input{width:18px;height:18px;accent-color:var(--ink);flex:none}
+.pf-feats{border:0;padding:0;margin:16px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 18px}
+.pf-feats legend{font:600 var(--t-label)/1.2 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:0;margin-bottom:8px}
+.pf-ta{min-height:110px;resize:vertical;line-height:1.5}
+.pf-ch{margin:24px 0 0;padding-top:22px;border-top:1px solid var(--line)}
+.pf-ch .pf-h3{margin-top:0}
+.hint b{color:var(--ink)}
+.pf-danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+@media (hover:hover){.btn.pf-danger:hover{background:var(--bad);border-color:var(--bad);color:#fff}}
+.pf-danger-l{color:var(--bad)}
+
+/* link de uso único */
+.pf-once{margin-bottom:28px;border-color:var(--ok);display:grid;gap:12px}
+.pf-once:focus{outline:2px solid var(--ok);outline-offset:2px}
+.pf-once h2{margin:0}
+.pf-copy{display:flex;gap:10px}
+.pf-copy .in{font:500 14px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace}
+.pf-copy .btn{min-height:48px}
+@media (max-width:560px){.pf-copy{flex-direction:column}}
+
+/* filtros */
+.pf-filters{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:end;margin:6px 0 18px}
+.pf-filters .field:first-child{flex:1 1 260px;max-width:420px}
+.pf-filters .field:nth-child(2){flex:0 1 200px}
+.pf-count{margin-left:auto;padding-bottom:12px}
+
+/* tabelas da plataforma (viram cartões no celular) */
+.pt-wrap{overflow-x:auto;border-top:1px solid var(--ink)}
+.pt{width:100%;border-collapse:collapse;font-size:14px}
+.pt th,.pt td{padding:14px 16px 14px 0;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.pt thead th{font:600 var(--t-label)/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-top:12px}
+.pt tbody th{font-weight:400}
+.pt .r{text-align:right}
+.pt td:last-child,.pt th:last-child{padding-right:0}
+.pt code,.pf-audit code{font-size:13px}
+.pt-mini th,.pt-mini td{padding:9px 12px 9px 0}
+.pf-name{display:block;font:400 21px/1.15 var(--serif);text-decoration:none;color:var(--ink)}
+@media (hover:hover){.pf-name:hover{color:var(--accent)}}
+.pt small{display:block;margin-top:3px}
+.pf-acts{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:flex-end;font-size:14px}
+.pt td.pf-acts{display:table-cell;text-align:right;white-space:nowrap}
+.pt td.pf-acts .link+.link{margin-left:14px}
+@media (max-width:760px){
+  .pt-wrap{overflow:visible}
+  .pt thead{display:none}
+  .pt,.pt tbody,.pt tr,.pt th,.pt td{display:block}
+  .pt tr{padding:14px 0;border-bottom:1px solid var(--line)}
+  .pt th,.pt td{border:0;padding:3px 0;text-align:left}
+  .pt .r{text-align:left}
+  .pt td[data-l]{display:grid;grid-template-columns:120px minmax(0,1fr);column-gap:12px;align-items:baseline}
+  .pt td[data-l]::before{content:attr(data-l);grid-column:1;color:var(--muted);font-size:13px}
+  .pt td[data-l]>*{grid-column:2;justify-self:start}
+  .pt td[data-l] br{display:none}
+  .pt td.pf-acts{display:flex;justify-content:flex-start;padding-top:8px}
+}
+
+/* listas */
+.pf-list{list-style:none;margin:0;padding:0}
+.pf-list li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.pf-list li:first-child{border-top:1px solid var(--line)}
+.pf-list li>div{min-width:0;overflow-wrap:anywhere}
+.pf-list .link{white-space:nowrap}
+@media (max-width:560px){.pf-list li{flex-direction:column;align-items:flex-start;gap:8px}.pf-list .pf-acts{justify-content:flex-start}}
+.pf-bars{list-style:none;margin:0 0 8px;padding:0}
+.pf-bars li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+
+/* planos */
+.pf-plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:18px}
+.pf-plan{display:grid;gap:10px;align-content:start}
+.pf-plan h3{font-size:30px;line-height:1}
+.pf-plan.off{opacity:.62}
+.pf-price{font:400 24px/1.25 var(--serif)}
+.pf-price small{font:400 13px/1 var(--sans);color:var(--muted)}
+.pf-plan .pf-acts{justify-content:flex-start;margin-top:6px}
+
+/* uso */
+.pf-stats{margin-bottom:8px}
+.pf-stats .n span{font:400 18px/1 var(--sans)}
+
+/* domínios */
+.pf-steps{margin:0;padding-left:22px;display:grid;gap:14px;font-size:15px}
+.pf-steps li::marker{font:400 18px var(--serif);color:var(--accent)}
+.pf-steps code,.pf-copy code{font-size:13px;padding:1px 5px;background:color-mix(in srgb,var(--paper-2) 80%,transparent)}
+
+/* suporte */
+.pf-tickets li{align-items:flex-start}
+.pf-thread{list-style:none;margin:0 0 28px;padding:0;display:grid;gap:14px;max-width:760px}
+.pf-thread li{padding:16px 20px;border:1px solid var(--line);display:grid;gap:8px}
+.pf-thread li.us{margin-left:clamp(0px,6vw,64px);border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.pf-thread li.them{margin-right:clamp(0px,6vw,64px)}
+.pf-msg{white-space:pre-wrap;overflow-wrap:anywhere}
+#rp{max-width:760px}
+
+/* página "site em pausa" (servida pelo Worker para casamento suspenso) */
+.pausa{min-height:100svh;display:grid;place-items:center;padding:24px}
+.pausa-box{max-width:560px;display:grid;gap:18px;text-align:center;justify-items:center}
+.pausa-box h1{font-size:clamp(36px,6vw,64px);line-height:1.02}

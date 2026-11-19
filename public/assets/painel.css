@@ -156,3 +156,9 @@ fieldset.field legend span{font:600 var(--t-label)/1.2 var(--sans);letter-spacin
 .tag.over{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
 .cat-acts{display:flex;flex-wrap:wrap;gap:16px;padding-top:10px;border-top:1px solid var(--line)}
 @media (max-width:520px){.items li{flex-direction:column}.it-r{justify-items:start;text-align:left}}
+
+/* muitas abas: a barra rola para o lado em vez de transbordar */
+.bar .wrap{min-width:0}
+.tabs{min-width:0;flex:1 1 auto;justify-content:safe center;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tabs a{flex:0 0 auto}

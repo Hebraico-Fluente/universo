@@ -1,0 +1,49 @@
+/* Experiências no convite pessoal: envelope secreto, passaporte, quest e concierge (variáveis do tema) */
+.xp-sec{max-width:860px;padding-top:clamp(48px,7vw,80px)}
+.xp-h{display:grid;gap:10px;margin-bottom:24px}
+.xp-h h2{font-size:var(--t-h2);line-height:1.05}
+.xp-h .muted{max-width:38em}
+
+/* mensagem secreta */
+.xp-env{position:relative;display:grid;gap:22px;padding:clamp(28px,5vw,52px);border-radius:var(--r-lg);text-align:center;justify-items:center;
+  background:color-mix(in srgb,var(--accent) 10%,var(--paper-2));border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);overflow:hidden;isolation:isolate}
+.xp-env::before{content:"";position:absolute;inset:0 0 auto;height:56%;z-index:-1;background:color-mix(in srgb,var(--accent) 16%,var(--paper-2));clip-path:polygon(0 0,100% 0,50% 100%);transition:transform .8s var(--ease)}
+.xp-env.reading::before{transform:translateY(-100%)}
+.xp-env-face{display:grid;gap:12px;justify-items:center;max-width:30em}
+.xp-env-face h2{font-size:clamp(30px,4.4vw,46px);line-height:1.05}
+.xp-env-face .btn{margin-top:8px}
+.xp-letter{width:min(100%,560px);display:grid;gap:16px;padding:clamp(24px,4vw,40px);background:var(--paper);border-radius:var(--r-lg);box-shadow:0 30px 60px -40px rgba(0,0,0,.45);text-align:left}
+.xp-letter:focus{outline:none}
+.xp-letter h3{font-size:var(--t-h3)}
+.xp-body{font:400 clamp(19px,2vw,23px)/1.55 var(--serif);color:var(--ink);white-space:pre-line}
+.xp-media{width:100%;border-radius:var(--r-lg)}
+.xp-sign{justify-self:end;font:400 22px/1 var(--serif);font-style:italic;color:var(--accent)}
+
+/* passaporte */
+.xp-pass{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.xp-stamp{position:relative;display:grid;grid-template-columns:52px 1fr auto;gap:18px;align-items:center;padding:20px 22px;border:1px dashed color-mix(in srgb,var(--ink) 28%,transparent);border-radius:var(--r-lg);background:var(--paper)}
+.xp-stamp.done{border-style:solid;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 6%,var(--paper))}
+.xp-n{font:400 30px/1 var(--serif);color:var(--accent)}
+.xp-st-b{display:grid;gap:4px;min-width:0}
+.xp-st-b h3{font-size:var(--t-h3)}
+.xp-when{font-weight:600}
+.xp-link{font-weight:600;color:var(--accent);font-size:14px;text-underline-offset:3px}
+.xp-seal{display:grid;place-items:center;width:92px;height:92px;border-radius:50%;border:2px solid var(--accent);color:var(--accent);font:700 11px/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;transform:rotate(-12deg);box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 5px color-mix(in srgb,var(--accent) 60%,transparent)}
+.xp-stamp.just .xp-seal{animation:xpStamp .5s var(--ease) both}
+@keyframes xpStamp{from{transform:rotate(-12deg) scale(1.6);opacity:0}to{transform:rotate(-12deg) scale(1);opacity:1}}
+.xp-wait{font-size:13px;color:var(--muted);text-align:right;max-width:9em}
+@media (max-width:600px){.xp-stamp{grid-template-columns:40px 1fr}.xp-seal-w{grid-column:2;justify-self:start}.xp-seal{width:76px;height:76px}.xp-wait{text-align:left}}
+
+/* quest */
+.xp-quest{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.xp-q{position:relative;display:grid;grid-template-columns:28px 1fr;gap:14px;align-items:start;min-height:64px;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper);cursor:pointer;transition:border-color .2s,background-color .2s}
+.xp-q input{position:absolute;opacity:0;width:1px;height:1px}
+.xp-box{width:24px;height:24px;margin-top:2px;border:1.5px solid color-mix(in srgb,var(--ink) 40%,transparent);border-radius:50%;display:grid;place-items:center;transition:background-color .2s,border-color .2s}
+.xp-q.done{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 6%,var(--paper))}
+.xp-q.done .xp-box{background:var(--accent);border-color:var(--accent)}
+.xp-q.done .xp-box::after{content:"";width:10px;height:5px;border:2px solid var(--accent-ink);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.xp-q input:focus-visible+.xp-box{outline:2px solid var(--accent);outline-offset:3px}
+.xp-qt{display:grid;gap:3px}
+.xp-qt span{font-size:14px;color:var(--ink-2)}
+.xp-qnote{margin-top:12px;min-height:1.4em}
+@media (prefers-reduced-motion:reduce){.xp-env::before{transition:none}.xp-stamp.just .xp-seal{animation:none}}
