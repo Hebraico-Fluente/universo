@@ -21,8 +21,11 @@ npm run e2e       # (com o dev rodando) percorre tudo no celular e no computador
 As senhas acima existem só nos dados de demonstração locais. Em produção, crie usuários reais.
 
 ## Publicar
-1. Crie o repositório no GitHub e adicione o segredo `CLOUDFLARE_API_TOKEN`.
-2. Cada push na `main` roda os testes, publica o Worker e aplica as migrações do D1.
+Dois caminhos, ambos rodam `scripts/deploy.sh` (publica, cria as tabelas e, só com o banco vazio, carrega os dados iniciais):
+
+- **Cloudflare Workers Builds** (atual): projeto importado do GitHub em Workers & Pages, com
+  *Deploy command* `sh scripts/deploy.sh`. Cada push na `main` publica.
+- **GitHub Actions**: adicione o segredo `CLOUDFLARE_API_TOKEN` no repositório. Sem o segredo, o Actions só roda os testes.
 
 ## Documentação
 `docs/PRODUCT_VISION.md` · `docs/FEATURE_MATRIX.md` · `docs/ARCHITECTURE.md` · `docs/DATABASE_SCHEMA.md` ·
