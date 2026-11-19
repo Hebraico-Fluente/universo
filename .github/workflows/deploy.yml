@@ -19,9 +19,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Verificar segredo
+        id: s
         env: { CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}" }
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta o segredo CLOUDFLARE_API_TOKEN (Settings → Secrets and variables → Actions)."; exit 1; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::Sem CLOUDFLARE_API_TOKEN: a publicação fica com a Cloudflare (Workers Builds). Este passo foi pulado."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
       - name: Publicar
+        if: steps.s.outputs.ok == 'true'
         env: { CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}" }
         run: sh scripts/deploy.sh
