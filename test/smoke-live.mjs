@@ -10,7 +10,8 @@ const ok = (c, m) => { console.log((c ? "ok    " : "FALHA ") + m); if (!c) fails
 const b = await chromium.launch();
 const c = await b.newContext({ ...devices["iPhone 13"] }); const p = await c.newPage();
 p.on("pageerror", e => errs.push(e.message));
-p.on("console", m => { if (m.type() === "error" && !/fonts\.g|401 \(Unauthorized\)/.test(m.text())) errs.push(m.text()); // 401 de /api/me antes do login é esperado });
+// o 401 de /api/me antes do login é esperado (o painel mostra a tela de entrada)
+p.on("console", m => { if (m.type() === "error" && !/fonts\.g|401 \(Unauthorized\)/.test(m.text())) errs.push(m.text()); });
 await p.goto(B + "/", { waitUntil: "networkidle" }); await W(800);
 ok((await p.locator("h1").innerText()).includes("Seu casamento"), "landing no ar");
 await p.screenshot({ path: OUT + "live-landing.png" });
