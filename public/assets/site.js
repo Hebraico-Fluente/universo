@@ -5,6 +5,12 @@ import { brcode } from "./pix.js";
 import { qrcode } from "./vendor/qrcode.js";
 import { SITE_MODS } from "./site-mods/index.js";
 
+/** Frases escritas para a identidade de um casal específico (os demais recebem textos genéricos). */
+const THEME_TEXT = {
+  petalucas: { dress: "Esporte fino, <em>pronto para a pista</em>", quizMid: "Conhece bem o casal. Na festa, puxa a conversa sobre o Djavan." },
+};
+
+
 const slug = location.pathname.split("/")[2];
 const app = $("#app");
 
@@ -24,7 +30,10 @@ try {
   document.title = `${w.names} · ${longDate(w.date)}`;
   render(w, events, messages || [], universe, loaded, mods || {});
 } catch (e) {
-  app.innerHTML = `<main class="empty wrap"><p class="label">Site não encontrado</p><h1>Não achamos este casamento.</h1><p class="muted">Confira o endereço com os noivos.</p></main>`;
+  if (e.status !== 404) console.error(e);
+  app.innerHTML = e.status === 404
+    ? `<main class="empty wrap"><p class="label">Site não encontrado</p><h1>Não achamos este casamento.</h1><p class="muted">Confira o endereço com os noivos.</p></main>`
+    : `<main class="empty wrap"><p class="label">Ops</p><h1>Não conseguimos abrir o site agora.</h1><p class="muted">Atualize a página em alguns instantes.</p></main>`;
 } finally { app.removeAttribute("aria-busy"); }
 
 function render(w, events, messages, universe, loaded = [], mods = {}) {
@@ -202,11 +211,6 @@ function parseCents(v) {
 }
 
 /** Quiz "Quanto você conhece o casal?" — uma pergunta por vez, com a curiosidade depois de cada resposta. */
-/** Frases escritas para a identidade de um casal específico (os demais recebem textos genéricos). */
-const THEME_TEXT = {
-  petalucas: { dress: "Esporte fino, <em>pronto para a pista</em>", quizMid: "Conhece bem o casal. Na festa, puxa a conversa sobre o Djavan." },
-};
-
 function quiz(box, w) {
   const Q = w.quiz; let i = 0, score = 0;
   const band = n => n === Q.length ? ["Testemunha oficial dessa história!", "Você sabe tudo. Já pode contar essa história no brinde."]
