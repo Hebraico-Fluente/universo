@@ -1,0 +1,92 @@
+/* =====================================================================
+   Identidade de Pétala & Lucas
+   Verde-folha, creme, coral do coração · TrashHand (manuscrita) + Quicksand
+   Cores, fontes, logo e mapa vêm da identidade do casal.
+   ===================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap");
+@font-face{font-family:"TrashHand";src:url("/assets/themes/petalucas/TrashHand.ttf") format("truetype");font-display:swap}
+
+[data-theme="petalucas"]{
+  --paper:#FDFAF3; --paper-2:#F6EEDD; --ink:#223A23; --ink-2:#3F5A40; --muted:#6E7F6A; --line:rgba(34,58,35,.16);
+  --accent:#29672E; --accent-ink:#FDFAF3; --coral:#DE826A; --coral-soft:#F6D9CF; --sage:#E3EADC;
+  --serif:"TrashHand","Quicksand",cursive; --sans:"Quicksand",system-ui,sans-serif;
+  --r:999px; --r-lg:22px; --dur:.9s; --dist:16px;
+}
+[data-theme="petalucas"] body{font-weight:500;overflow-x:hidden}
+/* TrashHand só em títulos curtos; números e textos longos ficam em Quicksand para ler bem */
+[data-theme="petalucas"] h1,[data-theme="petalucas"] h2,[data-theme="petalucas"] h3{font-family:"TrashHand",cursive;letter-spacing:.02em;font-weight:400;color:var(--accent)}
+[data-theme="petalucas"] .sh{text-align:center}
+[data-theme="petalucas"] .sh::after{display:none}
+[data-theme="petalucas"] .sh h2{font-size:clamp(46px,6.6vw,84px);line-height:.95}
+[data-theme="petalucas"] .sh h2 em{font-style:normal;color:var(--coral)}
+[data-theme="petalucas"] .label{color:var(--muted);font-family:var(--sans);font-weight:700}
+[data-theme="petalucas"] .label .n{color:var(--coral)}
+[data-theme="petalucas"] .label::before,[data-theme="petalucas"] .label::after{display:none}
+
+/* topo */
+[data-theme="petalucas"] .mono{font:400 26px/1 "TrashHand",cursive;color:var(--accent)}
+[data-theme="petalucas"] .top nav a{color:var(--ink-2);font-family:var(--sans);font-weight:600;letter-spacing:.06em;text-transform:none;font-size:15px}
+[data-theme="petalucas"] .scrolled .top{background:color-mix(in srgb,var(--paper) 94%,transparent)}
+
+/* abertura: o logo ilustrado é o protagonista, com as manchas orgânicas da identidade */
+[data-theme="petalucas"] .hero{text-align:center;padding:140px 0 90px;min-height:100svh;display:grid;align-content:center;position:relative;overflow:hidden;isolation:isolate}
+[data-theme="petalucas"] .hero::before,[data-theme="petalucas"] .hero::after{content:"";display:block;position:absolute;z-index:-1;border-radius:58% 42% 55% 45%/52% 60% 40% 48%;background:var(--coral-soft);inset:auto}
+[data-theme="petalucas"] .hero::before{width:min(420px,60vw);aspect-ratio:1;right:-110px;top:-120px;animation:blob 18s ease-in-out infinite alternate}
+[data-theme="petalucas"] .hero::after{width:min(360px,56vw);aspect-ratio:1.2;left:-140px;bottom:60px;background:var(--sage);animation:blob 22s ease-in-out infinite alternate-reverse}
+@keyframes blob{to{border-radius:42% 58% 45% 55%/60% 42% 58% 40%;transform:rotate(8deg) scale(1.04)}}
+[data-theme="petalucas"] .hero .label{color:var(--accent);font:400 clamp(26px,3.4vw,36px)/1 "TrashHand",cursive;letter-spacing:.04em;text-transform:none}
+[data-theme="petalucas"] .logo-names{margin:18px 0 22px}
+[data-theme="petalucas"] .hero-logo{width:min(520px,86vw)}
+[data-theme="petalucas"] .hero-date{font:600 clamp(18px,1.8vw,22px)/1.4 var(--sans);color:var(--ink);letter-spacing:0}
+[data-theme="petalucas"] .hero-date .dot{display:block;height:4px;visibility:hidden}
+[data-theme="petalucas"] .cd{justify-content:center;gap:12px;margin-top:30px}
+[data-theme="petalucas"] .cd div{min-width:78px;padding:16px 10px 12px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 30px -24px rgba(34,58,35,.45);backdrop-filter:none}
+[data-theme="petalucas"] .cd b{font:400 40px/1 "TrashHand",cursive;color:var(--accent)}
+[data-theme="petalucas"] .cd small{color:var(--muted);font-family:var(--sans);font-weight:700}
+[data-theme="petalucas"] .hero-acts{justify-content:center;margin-top:32px}
+[data-theme="petalucas"] .welcome{margin:30px auto 0;color:var(--ink-2);max-width:32em}
+
+/* botões em pílula, verde-folha */
+[data-theme="petalucas"] .btn{font-family:var(--sans);font-weight:700;letter-spacing:.01em;border-color:var(--accent);background:var(--accent);color:var(--paper)}
+[data-theme="petalucas"] .btn.ghost{background:#fff;color:var(--accent);border-color:var(--line)}
+@media (hover:hover){[data-theme="petalucas"] .btn:hover{background:var(--ink);border-color:var(--ink);color:var(--paper)}[data-theme="petalucas"] .btn.ghost:hover{background:var(--sage);color:var(--accent);border-color:var(--accent)}}
+
+/* seções */
+[data-theme="petalucas"] .sec.alt{background:var(--paper-2)}
+[data-theme="petalucas"] .story .chapter{text-align:left;padding:28px 30px;border-radius:var(--r-lg);background:#fff;border:1px solid var(--line);margin-inline:auto}
+[data-theme="petalucas"] .yr{font:400 54px/1 "TrashHand",cursive;color:var(--coral)}
+[data-theme="petalucas"] .chapter h3{font-size:30px}
+[data-theme="petalucas"] .event{border:1px solid var(--line);border-radius:var(--r-lg);background:#fff;padding:30px}
+[data-theme="petalucas"] .when .num{font:400 44px/1 "TrashHand",cursive;color:var(--accent)}
+[data-theme="petalucas"] .event h3{font-size:38px}
+[data-theme="petalucas"] .map img{border-radius:var(--r-lg);box-shadow:0 24px 50px -36px rgba(34,58,35,.5)}
+[data-theme="petalucas"] .sub{text-align:center;font-size:clamp(34px,4vw,48px)}
+[data-theme="petalucas"] .schedule{margin:0 auto}
+[data-theme="petalucas"] .schedule::before{background:color-mix(in srgb,var(--accent) 35%,transparent);left:50%}
+[data-theme="petalucas"] .step{grid-template-columns:1fr 48px 1fr;gap:18px}
+[data-theme="petalucas"] .step .t{font:700 14px/1 var(--sans);justify-self:end;align-self:center;padding:7px 12px;border-radius:999px;background:var(--sage);color:var(--accent)}
+[data-theme="petalucas"] .step .dot{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+[data-theme="petalucas"] .step:nth-child(even) .t{order:3;justify-self:start}
+[data-theme="petalucas"] .step:nth-child(even) div{order:1;text-align:right}
+[data-theme="petalucas"] .step:nth-child(even) .dot{order:2}
+[data-theme="petalucas"] .step h3{font-size:28px}
+@media (max-width:640px){
+  [data-theme="petalucas"] .schedule::before{left:24px}
+  [data-theme="petalucas"] .step,[data-theme="petalucas"] .step:nth-child(even){grid-template-columns:48px 1fr;gap:14px}
+  [data-theme="petalucas"] .step .dot,[data-theme="petalucas"] .step:nth-child(even) .dot{order:0;grid-row:span 2}
+  [data-theme="petalucas"] .step .t,[data-theme="petalucas"] .step:nth-child(even) .t{order:1;justify-self:start}
+  [data-theme="petalucas"] .step div,[data-theme="petalucas"] .step:nth-child(even) div{order:2;text-align:left}
+}
+[data-theme="petalucas"] .dcard{background:#fff;text-align:center;justify-items:center}
+[data-theme="petalucas"] .dico{background:var(--sage);color:var(--accent)}
+[data-theme="petalucas"] .dcard h3{font-size:30px}
+[data-theme="petalucas"] .rsvp-note{margin:0 auto;text-align:center}
+[data-theme="petalucas"] .rule-note{border-left:0;border-radius:var(--r-lg);background:var(--sage);color:var(--ink)}
+[data-theme="petalucas"] .gb-form{background:#fff}
+[data-theme="petalucas"] .gb-item{background:#fff;border:1px solid var(--line)}
+[data-theme="petalucas"] .gb-item p{font:500 18px/1.55 var(--sans)}
+[data-theme="petalucas"] .pix{background:var(--sage);border:0}
+[data-theme="petalucas"] .faq summary{font:600 19px/1.3 var(--sans)}
+[data-theme="petalucas"] .faq summary::after{color:var(--coral)}
+[data-theme="petalucas"] .foot{text-align:center}
+[data-theme="petalucas"] .foot .wrap{justify-content:center;flex-direction:column;align-items:center}
