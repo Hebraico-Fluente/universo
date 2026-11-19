@@ -89,7 +89,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
   const logo = w.theme ? `<img class="hero-logo" src="/assets/themes/${esc(w.theme)}/logo.png" alt="${esc(w.names)}" width="742" height="338">` : "";
   app.innerHTML = `
   <header class="top"><div class="wrap"><a class="mono" href="#topo">${w.theme ? esc(w.names) : `${esc(a?.[0] || "")}<i>&amp;</i>${esc(b?.[0] || "")}`}</a>
-    <nav aria-label="Seções">${nav.filter(([id]) => id !== "duvidas").map(([id, l]) => `<a href="#${id}">${esc(l.replace("Nossa ", "").replace("Mural de recados", "Recados"))}</a>`).join("")}</nav></div></header>
+    <nav aria-label="Seções">${nav.filter(([id]) => id !== "duvidas").map(([id, l]) => `<a href="#${id}">${esc(l.replace("Nossa história", "História").replace("Mural de recados", "Recados"))}</a>`).join("")}</nav></div></header>
   <main id="conteudo">
     <section class="hero${logo ? " has-logo" : ""}" id="topo">
       ${w.hero_image ? `<figure class="hero-img" data-bg="${esc(w.hero_image)}" role="img" aria-label="Foto do casal"></figure>` : ""}
