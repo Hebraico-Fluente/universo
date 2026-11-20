@@ -109,7 +109,9 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
         ${logo ? `<h1 class="names logo-names">${logo}</h1>` : `<h1 class="names"><span>${esc(a)}</span><i>&amp;</i><span>${esc(b)}</span></h1>`}
         <p class="hero-date">${esc(longDate(w.date))}<span class="dot">·</span>${esc(w.venue_name ? w.venue_name + " · " + w.city : w.city)}</p>
         <div class="cd" id="cd" aria-label="Contagem regressiva"></div>
-        <div class="hero-acts"><a class="btn accent" href="#presenca">Confirmar presença</a>${w.story.length ? `<a class="btn ghost" href="#historia">Nossa história</a>` : ""}</div>
+        <div class="hero-acts"><a class="btn accent" href="#presenca">Confirmar presença</a>${w.story.length ? `<a class="btn ghost" href="#historia">Nossa história</a>` : ""}
+          <details class="addcal"><summary class="btn ghost">${icon("calendar")}Salvar na agenda</summary>
+            <div class="addcal-menu"><a href="${esc(googleCal(w, events))}" target="_blank" rel="noopener">Google Agenda</a><a href="/c/${esc(w.slug)}/agenda.ics">iPhone, Outlook e outros</a></div></details></div>
         ${w.welcome ? `<p class="welcome">${esc(w.welcome)}</p>` : ""}
       </div>
     </section>
@@ -156,6 +158,17 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
   for (const m of loaded) try { m.init?.({ w, data: mods[m.name], slug, api, $, $$, esc }); } catch (e) { console.error(e); }
   reveal();
   if (w.theme) import(`/assets/themes/${w.theme}/theme.js`).then(m => m.site?.()).catch(() => {}); // animações da identidade (opcional)
+}
+
+/** Link "adicionar ao Google Agenda" com os mesmos dados do .ics (só dados públicos do site). */
+function googleCal(w, events) {
+  const start = new Date(w.date), end = new Date(start.getTime() + 7 * 3600e3);
+  const f = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const main = events.find(e => e.address) || events[0] || {};
+  const place = [main.venue || w.venue_name, main.address || w.city].filter(Boolean).join(" · ");
+  const q = new URLSearchParams({ action: "TEMPLATE", text: `Casamento ${w.names}`, dates: `${f(start)}/${f(end)}`,
+    details: `Confirme presença, veja o cronograma e o traje no site: ${location.origin}/c/${w.slug}`, location: place });
+  return "https://calendar.google.com/calendar/render?" + q.toString();
 }
 
 /** Presentes: QR Code e "copia e cola" do Pix com o valor do presente, e o aviso "Já presenteei" para os noivos. */

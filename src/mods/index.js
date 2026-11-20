@@ -8,5 +8,6 @@ import plataforma from "./plataforma.js";
 import editor from "./editor.js";
 import midia from "./midia.js";
 import experiencias from "./experiencias.js";
+import agenda from "./agenda.js";
 
-export const MODS = [convidados, organizacao, plataforma, editor, midia, experiencias];
+export const MODS = [convidados, organizacao, plataforma, editor, midia, experiencias, agenda];
