@@ -25,6 +25,7 @@ const FIELDS = {
   names: ["main", "names"], date: ["main", "date_iso"], city: ["main", "city"], venue_name: ["main", "venue_name"],
   rsvp_deadline: ["main", "rsvp_deadline"], welcome: ["main", "welcome"], rsvp_note: ["main", "rsvp_note"],
   universe: ["look", "universe"],
+  music_url: ["music", "music_url"], music_label: ["music", "music_label"],
   hero_image: ["images", "hero_image"], map_image: ["images", "map_image"],
   story: ["story", "story_json"], schedule: ["schedule", "schedule_json"], dress: ["dress", "dress_json"], faq: ["faq", "faq_json"],
   gifts: ["gifts", "gifts_json"], pix_key: ["gifts", "pix_key"], pix_name: ["gifts", "pix_name"], pix_city: ["gifts", "pix_city"], gift_url: ["gifts", "gift_url"],
@@ -53,6 +54,20 @@ function httpsUrl(v, field) {
   if (!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?(\/[^\s"'<>\\]*)?$/i.test(v)) fail(400, `${field}: use um endereço que comece com https://`, "invalid_url");
   return v;
 }
+/**
+ * Música do casal: só link de FAIXA do Spotify (com ou sem /intl-xx/, ?si=…, /embed/) ou spotify:track:ID.
+ * Guarda normalizado: https://open.spotify.com/track/ID (o site monta o embed oficial a partir do ID).
+ */
+export function spotifyTrackUrl(v, field = "Música") {
+  v = str(v, { max: 300, field });
+  if (!v) return "";
+  const m = v.match(/^https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z]{2}(?:-[a-zA-Z]{2})?\/)?(?:embed\/)?track\/([A-Za-z0-9]{22})\/?(?:\?[\w.~%=&+-]*)?$/)
+    || v.match(/^spotify:track:([A-Za-z0-9]{22})$/);
+  if (!m) fail(400, `${field}: cole o link de uma música do Spotify (Compartilhar › Copiar link da música)`, "invalid_url");
+  return "https://open.spotify.com/track/" + m[1];
+}
+/** ID da faixa a partir do valor guardado (ou "" se não houver/for inválido). */
+export const spotifyTrackId = v => (String(v || "").match(/^https:\/\/open\.spotify\.com\/track\/([A-Za-z0-9]{22})$/) || [])[1] || "";
 function list(v, max, field, fn) {
   if (!Array.isArray(v)) fail(400, `${field}: lista inválida`, "invalid");
   if (v.length > max) fail(400, `${field}: no máximo ${max} itens`, "too_many");
@@ -74,6 +89,8 @@ const V = {
   welcome: v => str(v, { max: 600, field: "Boas-vindas" }),
   rsvp_note: v => str(v, { max: 400, field: "Recado da confirmação" }),
   universe: v => oneOf(v, UNIVERSES, "Universo visual"),
+  music_url: v => spotifyTrackUrl(v, "Música"),
+  music_label: v => str(v, { max: 60, field: "Nome da música" }),
   hero_image: v => imageUrl(v, "Foto de capa"),
   map_image: v => imageUrl(v, "Mapa ilustrado"),
   story: v => list(v, MAX.story, "História", (x, f) => {

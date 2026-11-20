@@ -223,35 +223,87 @@ function parseCents(v) {
   return Number.isFinite(n) && n > 0 && n <= 10000000 ? n : 0;
 }
 
-/** Quiz "Quanto você conhece o casal?" — uma pergunta por vez, com a curiosidade depois de cada resposta. */
+/** Quiz "Quanto você conhece o casal?" — nome primeiro (ranking), uma pergunta por vez, curiosidade depois de cada resposta.
+ *  A pontuação do ranking é calculada pelo servidor (POST /api/site/:slug/quiz, src/mods/quiz.js). */
 function quiz(box, w) {
-  const Q = w.quiz; let i = 0, score = 0;
+  const Q = w.quiz, KEY = `quiz-nome:${w.slug}`;
+  const norm = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  let i = 0, score = 0, answers = [], started = 0, name = "";
+  try { name = localStorage.getItem(KEY) || ""; } catch {}
   const band = n => n === Q.length ? ["Testemunha oficial dessa história!", "Você sabe tudo. Já pode contar essa história no brinde."]
     : n >= Q.length - 2 ? ["Quase da família!", (THEME_TEXT[w.theme] || {}).quizMid || "Conhece bem o casal. Na festa, puxa assunto sobre essa história."]
     : ["Vem com a gente na pista!", "Ainda dá tempo de conhecer melhor: senta perto deles e pede a história completa."];
-  const draw = () => {
-    if (i >= Q.length) {
-      const [t, d] = band(score);
-      const msg = `Fiz ${score}/${Q.length} no quiz de ${w.names}! E você, quanto conhece o casal? ${location.origin}${location.pathname}#quiz`;
-      box.innerHTML = `<div class="qend"><p class="qscore num">${score}<span>/${Q.length}</span></p><h3>${esc(t)}</h3><p>${esc(d)}</p>
-        <div class="qacts"><a class="btn" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Desafiar no WhatsApp</a><button class="btn ghost" type="button" id="qAgain">Jogar de novo</button></div></div>`;
-      $("#qAgain").onclick = () => { i = 0; score = 0; draw(); };
-      return;
+  const rankHtml = (top, me) => top.length
+    ? `<ol class="qrank">${top.map((r, k) => { const mine = r.me ?? (me && norm(r.name) === norm(me));
+        return `<li${mine ? ` class="me" aria-current="true"` : ""}><span class="qpos num">${k + 1}º</span><span class="qnm">${esc(r.name)}${mine ? ` <small>(você)</small>` : ""}</span><span class="qpts num">${r.score}/${r.total}</span></li>`; }).join("")}</ol>`
+    : `<p class="qrank-empty muted">Ninguém jogou ainda. Seja a primeira pessoa no ranking!</p>`;
+
+  const start = () => {
+    box.innerHTML = `<form class="qstart" novalidate>
+        <p class="qintro">São ${Q.length} perguntas. Acerte o máximo que puder e entre no ranking dos amigos.</p>
+        <div class="field"><label for="qName"><span>Seu nome</span></label>
+          <input class="in" id="qName" name="name" minlength="2" maxlength="40" autocomplete="name" enterkeyhint="go" required value="${esc(name)}" aria-describedby="qNameHint qNameErr"></div>
+        <p class="hint qhint" id="qNameHint">Seu nome aparece no ranking deste site.</p>
+        <p class="error" id="qNameErr" role="alert"></p>
+        <div class="qacts"><button class="btn accent" type="submit">Começar o quiz</button><button class="btn ghost" type="button" aria-expanded="false" aria-controls="qRankBox" data-rank>Ver ranking</button></div>
+        <div class="qrank-box" id="qRankBox" hidden></div>
+      </form>`;
+    const f = box.querySelector("form"), rk = box.querySelector("[data-rank]"), rb = $("#qRankBox");
+    rk.onclick = async () => {
+      const open = rb.hidden; rb.hidden = !open; rk.setAttribute("aria-expanded", String(open));
+      rk.textContent = open ? "Esconder ranking" : "Ver ranking";
+      if (!open) return;
+      rb.innerHTML = `<p class="muted">Carregando o ranking…</p>`;
+      try { const r = await api(`/api/site/${slug}/quiz/ranking`); rb.innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${rankHtml(r.top, name)}`; }
+      catch (x) { rb.innerHTML = `<p class="error">${esc(x.message)}</p>`; }
+    };
+    f.onsubmit = e => {
+      e.preventDefault();
+      const inp = $("#qName"), v = inp.value.trim().replace(/\s+/g, " ");
+      if (v.length < 2 || v.length > 40) { $("#qNameErr").textContent = "Escreva seu nome (de 2 a 40 letras) para entrar no ranking."; inp.setAttribute("aria-invalid", "true"); inp.focus(); return; }
+      name = v; try { localStorage.setItem(KEY, v); } catch {}
+      i = 0; score = 0; answers = []; started = Date.now();
+      draw(true);
+    };
+  };
+
+  const finish = async () => {
+    const [t, d] = band(score);
+    box.innerHTML = `<div class="qend"><p class="qscore num">${score}<span>/${Q.length}</span></p><h3 tabindex="-1">${esc(t)}</h3><p>${esc(d)}</p>
+      <p class="qplace" role="status">Você acertou ${score} de ${Q.length}. Calculando sua posição…</p><div class="qrank-box"></div>
+      <div class="qacts"><a class="btn" id="qWa" target="_blank" rel="noopener">Desafiar no WhatsApp</a><button class="btn ghost" type="button" id="qAgain">Jogar de novo</button></div></div>`;
+    const wa = place => `https://wa.me/?text=${encodeURIComponent(`Fiz ${score}/${Q.length} no quiz de ${w.names}${place ? ` e fiquei em ${place}º lugar` : ""}! E você, quanto conhece o casal? ${location.origin}${location.pathname}#quiz`)}`;
+    $("#qWa").href = wa(0);
+    $("#qAgain").onclick = start;
+    box.querySelector("h3").focus({ preventScroll: true });
+    try {
+      const r = await api(`/api/site/${slug}/quiz`, { method: "POST", body: { name, answers, seconds: Math.round((Date.now() - started) / 1000) } });
+      box.querySelector(".qplace").innerHTML = `Você acertou <b>${r.score} de ${r.total}</b> — <b>${r.position}º lugar</b>${r.improved ? "" : `<br><small>Sua melhor marca continua valendo: ${r.best.score} de ${r.best.total}.</small>`}`;
+      box.querySelector(".qrank-box").innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${rankHtml(r.top, name)}`;
+      $("#qWa").href = wa(r.position);
+    } catch (x) {
+      box.querySelector(".qplace").textContent = `Você acertou ${score} de ${Q.length}. Não deu para entrar no ranking agora: ${x.message}`;
     }
+  };
+
+  const draw = (focus = false) => {
+    if (i >= Q.length) return finish();
     const q = Q[i];
     box.innerHTML = `<div class="qhead"><span class="num">${i + 1} de ${Q.length}</span><span class="qbar"><i></i></span></div>
-      <h3 class="qq">${esc(q.q)}</h3><div class="qopts">${q.options.map((o, k) => `<button class="qopt" type="button" data-k="${k}">${esc(o)}</button>`).join("")}</div><div class="qfact" hidden></div>`;
+      <h3 class="qq" tabindex="-1">${esc(q.q)}</h3><div class="qopts">${q.options.map((o, k) => `<button class="qopt" type="button" data-k="${k}">${esc(o)}</button>`).join("")}</div><div class="qfact" hidden></div>`;
     box.querySelector(".qbar i").style.width = (i / Q.length * 100) + "%";
+    if (focus) box.querySelector(".qq").focus({ preventScroll: true });
     box.querySelectorAll(".qopt").forEach(b => b.onclick = () => {
       const k = +b.dataset.k, right = k === q.answer;
+      answers[i] = k;
       if (right) score++;
       box.querySelectorAll(".qopt").forEach(x => { x.disabled = true; if (+x.dataset.k === q.answer) x.classList.add("right"); });
       if (!right) b.classList.add("wrong");
       const f = box.querySelector(".qfact"); f.hidden = false;
       f.innerHTML = `<p><b>${right ? "Acertou!" : "Quase!"}</b> ${esc(q.fact)}</p><button class="btn sm" type="button">${i + 1 < Q.length ? "Próxima" : "Ver resultado"}</button>`;
-      f.querySelector("button").onclick = () => { i++; draw(); };
+      f.querySelector("button").onclick = () => { i++; draw(true); };
       f.querySelector("button").focus();
     });
   };
-  draw();
+  start();
 }

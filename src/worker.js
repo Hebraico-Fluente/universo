@@ -14,6 +14,7 @@
  *   POST /api/invite/:token/rsvp             respostas por pessoa e por evento
  *   POST /api/site/:slug/recados             recado no mural (só aparece no site depois que os noivos aprovam)
  *   POST /api/site/:slug/presentes           "Já presenteei": aviso do convidado depois do Pix (só os noivos veem)
+ *   POST /api/site/:slug/quiz  ·  GET …/quiz/ranking   ranking do quiz (src/mods/quiz.js)
  *
  * API dos noivos (sessão + papel; o casamento vem SEMPRE da sessão)
  *   POST /api/auth/login | /api/auth/logout   GET /api/me
@@ -37,6 +38,7 @@
  *   GET  /api/admin/export                    exporta todos os dados do casamento (LGPD)
  */
 import { MODS } from "./mods/index.js";
+import { spotifyTrackId } from "./mods/editor.js";
 import { householdByToken as guestsHouseholdByToken } from "./mods/convidados.js";
 import { gate as platformGate, logServerError, featuresOf } from "./mods/plataforma.js";
 import * as org from "./mods/organizacao.js"; // orçamento avançado (parcelas, histórico) e central da visão geral
@@ -60,6 +62,7 @@ const SECURITY_HEADERS = {
     "font-src 'self' https://fonts.gstatic.com",
     "script-src 'self'",
     "connect-src 'self'",
+    "frame-src https://open.spotify.com", // player da música do casal (só depois do clique do visitante)
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'self'",
@@ -317,7 +320,8 @@ function publicWedding(w) {
     rsvp_deadline: w.rsvp_deadline, is_demo: !!w.is_demo, slug: w.slug,
     theme: w.theme || "", venue_name: w.venue_name || "", schedule: parseJson(w.schedule_json, []), dress: parseJson(w.dress_json, []),
     map_image: w.map_image || "", gift_url: w.gift_url || "", rsvp_note: w.rsvp_note || "", guestbook: !!w.guestbook,
-    quiz: parseJson(w.quiz_json, []) };
+    quiz: parseJson(w.quiz_json, []),
+    music: spotifyTrackId(w.music_url) ? { track: spotifyTrackId(w.music_url), label: w.music_label || "" } : null };
 }
 
 /* ---------------- convite pessoal ---------------- */

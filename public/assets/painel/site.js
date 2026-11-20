@@ -9,7 +9,7 @@ const UNIVERSES = [
   ["dreamscape", "Sonho", "Cinematográfico: fundo de crepúsculo, fotos grandes e deriva suave. Para festas à noite, praia, destino."],
 ];
 const ICON_NAMES = { rings: "Alianças", music: "Música", pizza: "Pizza", glass: "Taça", sweet: "Doce", snack: "Lanche", moon: "Lua", shirt: "Camisa", shoe: "Sapato", palette: "Paleta", pin: "Local", clock: "Relógio", heart: "Coração" };
-const SECTION_NAMES = { main: "Dados principais", look: "Aparência", images: "Fotos", story: "Nossa história", schedule: "Cronograma", dress: "Traje", faq: "Dúvidas", gifts: "Presentes e Pix", quiz: "Quiz", visibility: "Seções do site" };
+const SECTION_NAMES = { main: "Dados principais", look: "Aparência", images: "Fotos", music: "Música", story: "Nossa história", schedule: "Cronograma", dress: "Traje", faq: "Dúvidas", gifts: "Presentes e Pix", quiz: "Quiz", visibility: "Seções do site" };
 const HIDE_NAMES = { story: "Nossa história", schedule: "Cronograma do dia", dress: "Traje", faq: "Dúvidas", gifts: "Presentes e Pix", quiz: "Quiz do casal" };
 const ZONES = [["-03:00", "Brasília (−03:00)"], ["-02:00", "Fernando de Noronha (−02:00)"], ["-04:00", "Manaus, Cuiabá (−04:00)"], ["-05:00", "Acre (−05:00)"]];
 const SAVED_MSG = "Salvo. Pode levar até 1 minuto para aparecer no site.";
@@ -38,6 +38,8 @@ function toCents(v) {
   return n <= 10_000_000 ? n : null;
 }
 const imgOk = v => !v || /^https:\/\/[a-z0-9.-]+(:\d+)?(\/[^\s"'()<>\\]*)?$/i.test(v) || (/^\/(m|assets)\/[A-Za-z0-9._~\/-]+$/.test(v) && !v.includes(".."));
+/** Mesma regra do servidor (src/mods/editor.js › spotifyTrackUrl): só link de música (faixa) do Spotify. */
+const spotifyOk = v => !v || /^https:\/\/open\.spotify\.com\/(?:intl-[a-zA-Z]{2}(?:-[a-zA-Z]{2})?\/)?(?:embed\/)?track\/[A-Za-z0-9]{22}\/?(?:\?[\w.~%=&+-]*)?$/.test(v) || /^spotify:track:[A-Za-z0-9]{22}$/.test(v);
 const httpsOk = v => !v || /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?(\/[^\s"'<>\\]*)?$/i.test(v);
 /** Fotos de outros sites são bloqueadas pela política de segurança (só fotos enviadas e images.unsplash.com aparecem). */
 const foreign = v => /^https:/i.test(v) && !/^https:\/\/images\.unsplash\.com\//i.test(v);
@@ -58,6 +60,7 @@ function render() {
     ["main", "Quem, quando e onde", mainSec(v)],
     ["look", "Universo visual", lookSec(v)],
     ["images", "Foto de capa e mapa", imagesSec(v)],
+    ["music", "A música de vocês", musicSec(v)],
     ["story", "Como chegamos até aqui", listSec("story", v, "Os capítulos aparecem em ordem, como uma linha do tempo. Use os botões para mudar a ordem.")],
     ["schedule", "O passo a passo da festa", listSec("schedule", v, "Os momentos da festa, do “sim” à saideira.")],
     ["dress", "O que vestir", listSec("dress", v, "Orientações de roupa e calçado para os convidados.")],
@@ -90,6 +93,7 @@ function render() {
   if (D.theme) $("#ed-look button[type=submit]").hidden = true;
   if (ro) $$(".ed-main input, .ed-main textarea, .ed-main select, .ed-main button:not([type=submit])").forEach(el => { el.disabled = true; });
   bind();
+  loadRank();
 }
 const hiddenTag = (id, v) => v.hidden.includes(id);
 function histHtml() {
@@ -164,6 +168,14 @@ function imagesSec(v) {
     ${imageField({ name: "map_image", label: "Mapa ilustrado (opcional)", value: v.map_image, lab: "Mapa ilustrado", hint: "Um mapa desenhado até o local, se vocês tiverem." })}`;
 }
 
+function musicSec(v) {
+  return `<p class="ed-desc">Uma música para os convidados ouvirem no site. Aparece um botão discreto no canto da tela, e a música só toca quando o convidado aperta o play: o site nunca toca nada sozinho.</p>
+    <div class="grid2">
+      ${field({ name: "music_url", label: "Link da música no Spotify", value: v.music_url, type: "url", max: 300, lab: "Música", hint: "No Spotify, abram a música e toquem em ••• › Compartilhar › Copiar link. Colem aqui (fica assim: https://open.spotify.com/track/…). Vazio = sem música.", attrs: `inputmode="url" placeholder="https://open.spotify.com/track/…" autocomplete="off" spellcheck="false"` })}
+      ${field({ name: "music_label", label: "Nome no botão (opcional)", value: v.music_label, max: 60, lab: "Nome da música", hint: "Ex.: Pétala — Djavan. Vazio: “Nossa música”." })}
+    </div>`;
+}
+
 function listSec(key, v, desc) {
   const L = LISTS[key];
   return `<p class="ed-desc">${esc(desc)}</p>${hiddenNote(key, v)}
@@ -214,7 +226,30 @@ function giftsSec(v) {
 function quizSec(v) {
   return `<div class="ed-warn" role="note"><b>Usem só fatos verdadeiros do casal.</b> Os convidados vão jogar e compartilhar o resultado: nada de inventar histórias ou expor quem não pediu.</div>
     ${!D.features.quiz ? `<p class="muted small">O quiz não está incluído no plano de vocês.</p>` : ""}
-    ${listSec("quiz", v, "Cada pergunta tem 4 opções e uma certa. Depois da resposta, aparece a curiosidade.")}`;
+    ${listSec("quiz", v, "Cada pergunta tem 4 opções e uma certa. Depois da resposta, aparece a curiosidade.")}
+    <div class="ed-sub ed-rank" aria-labelledby="edh-rank"><h3 id="edh-rank" tabindex="-1">Ranking dos amigos</h3>
+      <p class="muted small">Quem joga escreve o nome e entra no ranking do site (mais acertos; no empate, quem respondeu mais rápido). Vale a melhor tentativa de cada nome. Vocês podem apagar qualquer nome.</p>
+      <div id="edRank" aria-live="polite"><p class="muted small">Carregando o ranking…</p></div></div>`;
+}
+/** Ranking do quiz (src/mods/quiz.js): lista completa e "Apagar" (só noivos e assessoria). */
+const dur = s => s < 60 ? s + " s" : Math.floor(s / 60) + " min " + (s % 60) + " s";
+async function loadRank() {
+  const box = $("#edRank"); if (!box) return;
+  const ro = state.me?.role === "viewer";
+  try {
+    const { items } = await api("/api/admin/quiz");
+    box.innerHTML = items.length ? `<ol class="ed-rl">${items.map(x => `<li><span class="num ed-rp">${x.position}º</span><span class="ed-rn"><b>${esc(x.name)}</b>
+        <span class="muted small">${x.score} de ${x.total} · ${dur(x.seconds)}</span></span>
+        ${ro ? "" : `<button class="ed-ib danger" type="button" data-qdel="${esc(x.id)}" data-qname="${esc(x.name)}" aria-label="Apagar ${esc(x.name)} do ranking">Apagar</button>`}</li>`).join("")}</ol>
+        <p class="muted small">${items.length} ${items.length === 1 ? "pessoa jogou" : "pessoas jogaram"}. O site mostra as 10 primeiras.</p>`
+      : `<p class="muted small">Ninguém jogou ainda.</p>`;
+  } catch (x) { box.innerHTML = `<p class="error">${esc(x.message)}</p>`; }
+}
+async function delRank(b) {
+  if (!confirm(`Apagar “${b.dataset.qname}” do ranking do quiz?`)) return;
+  b.disabled = true;
+  try { await api(`/api/admin/quiz/${encodeURIComponent(b.dataset.qdel)}`, { method: "DELETE" }); await loadRank(); $("#edh-rank")?.focus({ preventScroll: true }); }
+  catch (x) { b.disabled = false; alert(x.message); }
 }
 function visSec(v) {
   const sw = (name, label, on, desc, dis) => { const id = nid("sw");
@@ -257,6 +292,11 @@ function collect(sec, form) {
   if (sec === "images") {
     for (const n of ["hero_image", "map_image"]) if (!imgOk(g(n).value.trim())) need(g(n), "Use um endereço que comece com https:// ou envie a foto.");
     return { errs, data: { hero_image: g("hero_image").value.trim(), map_image: g("map_image").value.trim() } };
+  }
+  if (sec === "music") {
+    const url = g("music_url").value.trim();
+    if (!spotifyOk(url)) need(g("music_url"), "Colem o link de uma música do Spotify (https://open.spotify.com/track/…).");
+    return { errs, data: { music_url: url, music_label: g("music_label").value } };
   }
   if (LISTS[sec] && sec !== "gifts") {
     const items = readList(sec);
@@ -335,6 +375,7 @@ function bind() {
     const b = e.target.closest("button, a[data-go]"); if (!b) return;
     if (b.dataset.go) { e.preventDefault(); const f = $(`#ed-${b.dataset.go}`); f.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); $(`#edh-${b.dataset.go}`).focus({ preventScroll: true }); return; }
     const form = b.closest(".ed-sec");
+    if (b.dataset.qdel) return delRank(b);
     if (b.dataset.add) return addItem(b.dataset.add, form);
     if (b.dataset.mv || b.dataset.rm !== undefined) return moveItem(b, form);
     if (b.dataset.undo) return undoSec(b.dataset.undo, form);
@@ -424,6 +465,7 @@ async function save(form) {
   try {
     const r = await api("/api/admin/site", { method: "PATCH", body: data });
     D.values = r.values; if (r.history) D.history = r.history;
+    if (sec === "music") form.querySelector("[name=music_url]").value = r.values.music_url; // mostra o link já normalizado
     dirty(form, false);
     status(form, r.changed.length ? SAVED_MSG : "Nada mudou desde o último salvamento.", "saved");
     afterChange();

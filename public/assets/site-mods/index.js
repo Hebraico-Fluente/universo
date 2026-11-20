@@ -12,4 +12,5 @@ export const SITE_MODS = [
   () => import("./lugares.js"), // experiencias: "Nossos lugares" (antes de "O grande dia")
   () => import("./documentario.js"), // experiencias: história em modo documentário (botão na seção História)
   () => import("./concierge.js"), // experiencias: "Pergunte aos noivos"
+  () => import("./musica.js"), // editor: música do casal (botão flutuante + player do Spotify só depois do clique)
 ];

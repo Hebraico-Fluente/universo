@@ -9,5 +9,6 @@ import editor from "./editor.js";
 import midia from "./midia.js";
 import experiencias from "./experiencias.js";
 import agenda from "./agenda.js";
+import quiz from "./quiz.js";
 
-export const MODS = [convidados, organizacao, plataforma, editor, midia, experiencias, agenda];
+export const MODS = [convidados, organizacao, plataforma, editor, midia, experiencias, agenda, quiz];

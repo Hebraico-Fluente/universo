@@ -32,7 +32,8 @@ Regras que valem para todos:
 
 ## Banco — `migrations/NNNN_nome.sql`
 Faixas de numeração por módulo (evita colisão): convidados **0010–0019**, organização **0020–0029**,
-plataforma **0030–0039**, editor **0040–0049**, mídia **0050–0059**, experiências **0060–0069**.
+plataforma **0030–0039**, editor **0040–0049**, mídia **0050–0059**, experiências **0060–0069**;
+0070+ em sequência (dados do casal real, música e ranking do quiz em 0074).
 Os testes aplicam todas as migrações em ordem (como o deploy). `schema.sql` é só referência.
 
 ## Painel — `public/assets/painel/<tela>.js`
