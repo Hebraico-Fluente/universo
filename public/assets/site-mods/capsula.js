@@ -33,7 +33,7 @@ export function sections({ data, esc }) {
           <li>Depois de enviada, a cápsula não pode ser editada.</li>
         </ul>
         <details class="cp-policy"><summary>Como a cápsula é guardada</summary>
-          <p>O conteúdo fica guardado no Universo <b>enquanto a conta deste casamento existir</b>. Na data, a cápsula se abre só para os noivos, que podem ler, ouvir e exportar tudo para guardar por conta própria.</p>
+          <p>O conteúdo fica guardado neste site <b>enquanto a conta deste casamento existir</b>. Na data, a cápsula se abre só para os noivos, que podem ler, ouvir e exportar tudo para guardar por conta própria.</p>
           <p>O lacre é feito pelo sistema, não é criptografia: a equipe técnica que mantém o serviço tem acesso ao banco de dados, como em qualquer serviço online. Se a conta for encerrada antes da data, as cápsulas lacradas são apagadas junto.</p>
           <p>Dez anos é muito tempo para qualquer serviço na internet. Se a mensagem for muito importante para você, guarde também uma cópia.</p>
         </details>

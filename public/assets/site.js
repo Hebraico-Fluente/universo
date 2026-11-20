@@ -117,7 +117,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
     </section>
     ${sections.join("")}
   </main>
-  <footer class="foot"><div class="wrap"><p>${esc(w.names)} · ${esc(longDate(w.date))}</p><p class="muted">Site feito com Universo · Gueta Studio</p></div></footer>
+  <footer class="foot"><div class="wrap"><p>${esc(w.names)} · ${esc(longDate(w.date))}</p><p class="muted">Site feito por <a class="credit" href="https://guetastudio.com.br/?utm_source=casamento&amp;utm_medium=rodape" target="_blank" rel="noopener">Gueta Studio</a></p></div></footer>
   ${w.pix_key ? `<dialog class="pixdlg" id="pixDlg" aria-labelledby="pixT"><div class="dlg-in">
     <button class="x" type="button" id="pixX" aria-label="Fechar">×</button>
     <p class="label">Presente</p><h3 id="pixT"></h3><p class="pv num" id="pixV"></p>
