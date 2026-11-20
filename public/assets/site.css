@@ -245,3 +245,10 @@
 .addcal-menu{position:absolute;z-index:20;left:50%;top:calc(100% + 8px);transform:translateX(-50%);min-width:230px;display:grid;padding:6px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--paper);box-shadow:0 24px 48px -24px rgba(0,0,0,.35)}
 .addcal-menu a{padding:12px 14px;border-radius:calc(var(--r-lg) - 2px);text-decoration:none;color:var(--ink);font:500 15px/1.2 var(--sans);text-align:left}
 .addcal-menu a:hover,.addcal-menu a:focus-visible{background:var(--paper-2)}
+
+/* presentes no celular: o título usa a largura toda; valor e botão ficam na linha de baixo */
+.gifts.rich h3{line-height:1.08}
+@media (max-width:560px){
+  .gifts.rich .gift{grid-template-areas:"ico txt txt" "ico v b";align-items:center;row-gap:12px}
+  .gifts.rich .v{justify-self:start}
+}

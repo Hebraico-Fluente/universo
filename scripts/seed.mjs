@@ -192,7 +192,6 @@ async function petalucas() {
   o.push(ins("households", { id: "h_pl_ex", wedding_id: W, name: "Exemplo · Marina e João", greeting: "Marina e João", message: "Vocês fazem parte dessa história. Contamos com vocês na pista!", max_guests: 2, token_hash: await sha256(PETALUCAS.token), token_at: "2026-11-19 12:00:00" }));
   [["Marina (exemplo)", 0], ["João (exemplo)", 1]].forEach(([n, i]) => o.push(ins("guests", { id: "g_pl_" + i, wedding_id: W, household_id: "h_pl_ex", name: n, is_child: 0, sort: i })));
   o.push(ins("invitations", { household_id: "h_pl_ex", event_id: "e_pl" }));
-  o.push(ins("guestbook", { id: "m_pl_1", wedding_id: W, author: "Recado de exemplo", message: "Que venha a pista, o samba e a pizza! Amamos vocês.", status: "approved" }));
   return o;
 }
 
