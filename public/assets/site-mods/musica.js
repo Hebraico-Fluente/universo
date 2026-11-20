@@ -1,13 +1,16 @@
 /**
- * Música do casal (editor do site › Música): botão flutuante discreto no canto inferior esquerdo.
- * - O site NUNCA toca sozinho: o iframe do Spotify só é criado depois do clique, e o visitante dá play no player oficial.
- * - "Silenciar" fecha o player e REMOVE o iframe (a música para). A escolha fica no localStorage: o botão volta compacto.
- * - "Recolher" esconde o player sem parar a música.
+ * Música do casal (editor do site › Música): player pequenino do Spotify no canto, que tenta tocar
+ * no PRIMEIRO TOQUE do visitante em qualquer lugar do site, com um botão redondo para silenciar.
+ * - Navegadores não deixam tocar som antes de um toque; por isso a tentativa é no primeiro toque/tecla.
+ * - Usa a API oficial de embed do Spotify (o player continua visível, como o Spotify exige).
+ * - Quem não está logado no Spotify ouve o trecho de 30 s que o Spotify libera; no iPhone pode ser preciso tocar no play.
+ * - "Silenciar" pausa e fica lembrado (localStorage): na próxima visita não toca sozinho; o botão toca de novo.
  * Dados: w.music = { track (ID de 22 caracteres), label } vindo de /api/site/:slug (worker.publicWedding).
  */
 export const name = "musica";
 
 const KEY = "musica-silenciada";
+const API = "https://open.spotify.com/embed/iframe-api/v1";
 const loadCss = href => { if (document.querySelector(`link[href="${href}"]`)) return; const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; document.head.append(l); };
 
 export function init({ w, esc }) {
@@ -21,46 +24,49 @@ export function init({ w, esc }) {
   const root = document.createElement("div");
   root.className = "mz" + (document.querySelector(".demo") ? " mz-up" : "");
   root.innerHTML = `
-    <section class="mz-panel" id="mzPanel" aria-label="Música do casal: ${esc(label)}" hidden>
-      <div class="mz-head"><p class="mz-t"><span aria-hidden="true">♪</span> ${esc(label)}</p>
-        <button class="mz-min" type="button" aria-label="Recolher o player (a música continua)"><span aria-hidden="true">⌄</span></button></div>
-      <div class="mz-frame"></div>
-      <div class="mz-foot"><p class="mz-hint">Toque no play do Spotify para ouvir.</p><button class="mz-mute" type="button">Silenciar</button></div>
-    </section>
-    <button class="mz-btn" type="button" aria-controls="mzPanel" aria-expanded="false"><span class="mz-ic" aria-hidden="true">♪</span><span class="mz-l">${esc(label)}</span></button>`;
+    <div class="mz-box" role="region" aria-label="Música do casal: ${esc(label)}">
+      <div class="mz-frame"><div id="mzEmbed"></div></div>
+      <button class="mz-mute" type="button"></button>
+    </div>`;
   document.body.append(root); document.body.classList.add("has-mz");
-  const btn = root.querySelector(".mz-btn"), panel = root.querySelector(".mz-panel"), frame = root.querySelector(".mz-frame");
-  const state = () => {
-    const open = !panel.hidden && !root.classList.contains("is-min"), playing = !!frame.firstChild;
-    root.classList.toggle("is-open", open);
-    panel.inert = root.classList.contains("is-min"); // recolhido: some da tela e do teclado, mas o iframe segue tocando
-    root.classList.toggle("is-compact", !playing && muted());
-    btn.setAttribute("aria-expanded", String(open));
-    btn.setAttribute("aria-label", playing && !open ? `Mostrar o player: ${label}` : `Ouvir a música do casal: ${label}`);
-    btn.title = label;
+  const muteBtn = root.querySelector(".mz-mute");
+  let ctrl = null, ready = false, playing = false, wantPlay = !muted();
+
+  const paint = () => {
+    root.classList.toggle("is-playing", playing);
+    root.classList.toggle("is-muted", !wantPlay); // o player some só quando o visitante silenciou (no iPhone ele pode precisar tocar no play)
+    muteBtn.innerHTML = playing ? `<span aria-hidden="true">🔊</span>` : `<span aria-hidden="true">🔇</span>`;
+    muteBtn.setAttribute("aria-label", playing ? `Silenciar a música (${label})` : `Tocar a música (${label})`);
+    muteBtn.title = playing ? "Silenciar" : `Tocar: ${label}`;
   };
-  const open = () => {
-    if (!frame.firstChild) {
-      const f = document.createElement("iframe");
-      f.src = `https://open.spotify.com/embed/track/${m.track}?utm_source=generator&theme=0`;
-      f.title = `Player do Spotify: ${label}`;
-      f.loading = "lazy";
-      f.allow = "encrypted-media; clipboard-write; fullscreen; picture-in-picture";
-      f.setAttribute("allowfullscreen", "");
-      f.width = "100%"; f.height = "152";
-      frame.append(f);
-    }
-    setMuted(false);
-    panel.hidden = false; root.classList.remove("is-min"); state();
-    root.querySelector(".mz-mute").focus({ preventScroll: true });
+  const play = () => { if (ctrl && ready) { try { ctrl.play(); } catch {} } };
+
+  // Primeiro toque/tecla em qualquer lugar: tenta tocar (se o visitante não silenciou antes)
+  const first = e => {
+    if (root.contains(e.target)) return; // o próprio botão cuida de si
+    off();
+    if (wantPlay) play();
   };
-  const close = () => { // para a música: o iframe sai da página
-    frame.replaceChildren(); panel.hidden = true; root.classList.remove("is-min");
-    setMuted(true); state(); btn.focus({ preventScroll: true });
+  const off = () => ["pointerdown", "keydown", "touchend"].forEach(t => document.removeEventListener(t, first, true));
+  ["pointerdown", "keydown", "touchend"].forEach(t => document.addEventListener(t, first, { capture: true, passive: true }));
+
+  muteBtn.addEventListener("click", () => {
+    off();
+    if (playing) { try { ctrl?.pause(); } catch {} setMuted(true); wantPlay = false; playing = false; }
+    else { setMuted(false); wantPlay = true; play(); }
+    paint();
+  });
+
+  // API oficial do Spotify: cria o player compacto no canto
+  window.onSpotifyIframeApiReady = IFrameAPI => {
+    IFrameAPI.createController(root.querySelector("#mzEmbed"), { uri: `spotify:track:${m.track}`, width: "100%", height: 80 }, c => {
+      ctrl = c;
+      c.addListener("ready", () => { ready = true; const f = root.querySelector("iframe"); if (f) f.title = `Player do Spotify: ${label}`; });
+      c.addListener("playback_update", e => { playing = !e.data.isPaused; paint(); });
+    });
   };
-  btn.addEventListener("click", () => (root.classList.contains("is-open") ? (root.classList.add("is-min"), state()) : open()));
-  root.querySelector(".mz-min").addEventListener("click", () => { root.classList.add("is-min"); state(); btn.focus({ preventScroll: true }); });
-  root.querySelector(".mz-mute").addEventListener("click", close);
-  root.addEventListener("keydown", e => { if (e.key === "Escape" && root.classList.contains("is-open")) { root.classList.add("is-min"); state(); btn.focus(); } });
-  state();
+  const s = document.createElement("script"); s.src = API; s.async = true;
+  s.onerror = () => root.remove(); // sem Spotify (rede bloqueada): nada aparece
+  document.head.append(s);
+  paint();
 }

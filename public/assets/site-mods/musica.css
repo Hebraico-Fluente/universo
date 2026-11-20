@@ -1,45 +1,14 @@
-/* Música do casal: botão flutuante no canto inferior esquerdo + mini player do Spotify (só depois do clique). */
-.mz{position:fixed;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));z-index:40;display:grid;justify-items:start;gap:10px;max-width:calc(100vw - 28px);font-family:var(--sans)}
-.mz.mz-up{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 48px)} /* acima do selo de demonstração */
-.mz-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;max-width:min(300px,calc(100vw - 28px));padding:0 16px 0 12px;border:1px solid var(--line);border-radius:999px;
-  background:color-mix(in srgb,var(--paper) 92%,transparent);color:var(--ink);font:600 14px/1.2 var(--sans);cursor:pointer;
-  box-shadow:0 10px 28px -14px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:transform .2s var(--ease,ease),border-color .2s,background-color .2s}
-.mz-ic{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink,var(--paper));font-size:15px;line-height:1}
-.mz-l{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-@media (hover:hover){.mz-btn:hover{border-color:var(--accent)}}
-.mz-btn:active{transform:scale(.97)}
-.mz-btn:focus-visible,.mz-panel button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* depois de silenciar: só o ícone, mais discreto (o nome fica no title e no rótulo acessível) */
-.mz.is-compact .mz-btn{padding:0 8px;gap:0;opacity:.86}
-.mz.is-compact .mz-l{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-/* tocando com o player recolhido: o ícone pulsa de leve */
-.mz:not(.is-open) .mz-panel:not([hidden]) + .mz-btn .mz-ic{animation:mzBeat 1.6s ease-in-out infinite}
-@keyframes mzBeat{50%{transform:scale(1.12)}}
-
-.mz-panel{width:min(340px,calc(100vw - 28px));padding:12px 12px 10px;border:1px solid var(--line);border-radius:var(--r-lg,18px);background:var(--paper);color:var(--ink);
-  box-shadow:0 24px 50px -22px rgba(0,0,0,.5);transform-origin:bottom left;animation:mzIn .28s var(--ease,ease) both}
-@keyframes mzIn{from{opacity:0;transform:translateY(8px) scale(.98)}}
-.mz.is-min .mz-panel{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);animation:none} /* fora da tela, mas o iframe continua tocando */
-.mz-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.mz-t{margin:0;min-width:0;font:700 15px/1.25 var(--sans);color:var(--accent);overflow-wrap:anywhere}
-.mz-min{flex:none;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:var(--paper-2);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
-.mz-frame iframe{display:block;width:100%;height:152px;border:0;border-radius:12px;background:var(--paper-2)}
-@media (max-width:600px){.mz-frame iframe{height:80px}}
-.mz-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
-.mz-hint{margin:0;font-size:12px;line-height:1.3;color:var(--muted)}
-.mz-mute{flex:none;min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font:600 14px/1 var(--sans);cursor:pointer}
-@media (hover:hover){.mz-mute:hover{border-color:var(--ink)}}
-
-/* tema Pétala & Lucas: verde, creme e coral */
-[data-theme="petalucas"] .mz-ic{background:var(--coral);color:#fff}
-[data-theme="petalucas"] .mz-btn{background:color-mix(in srgb,#fff 92%,transparent);color:var(--accent)}
-[data-theme="petalucas"] .mz-panel{background:#fff}
-[data-theme="petalucas"] .mz-t{font-family:"Quicksand",sans-serif}
-[data-theme="petalucas"] .mz-min{background:var(--sage);color:var(--accent)}
-
-@media (prefers-reduced-motion:reduce){.mz-panel,.mz-btn,.mz .mz-ic{animation:none!important;transition:none!important}}
-@media print{.mz{display:none}}
-/* celular, na abertura: só o ícone, para não encostar no "Confirmar presença"; o nome aparece depois de rolar */
-@media (max-width:600px){body:not(.scrolled) .mz:not(.is-open) .mz-btn{padding:0 8px;gap:0}
-  body:not(.scrolled) .mz:not(.is-open) .mz-l{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
-body.has-mz .foot{padding-bottom:calc(72px + env(safe-area-inset-bottom))} /* o fim da página não fica embaixo do botão */
+/* Música do casal: player pequenino do Spotify no canto inferior esquerdo + botão redondo de silenciar */
+.mz{position:fixed;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));z-index:60}
+.mz.mz-up{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 44px)}
+.mz-box{position:relative;display:flex;align-items:center;gap:8px}
+.mz-frame{width:min(250px,calc(100vw - 110px));height:80px;border-radius:14px;overflow:hidden;box-shadow:0 14px 30px -18px rgba(0,0,0,.45);background:transparent;transition:opacity .25s ease,transform .25s ease}
+.mz-frame iframe{display:block;border:0;width:100%;height:80px}
+.mz.is-muted .mz-frame{opacity:.0;transform:translateX(-12px);pointer-events:none;width:0;margin-right:-8px}
+.mz-mute{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,.12));background:var(--paper,#fff);color:var(--ink,#222);font-size:18px;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 24px -14px rgba(0,0,0,.45)}
+.mz-mute:hover{transform:scale(1.05)}
+.mz-mute:active{transform:scale(.95)}
+.mz-mute:focus-visible{outline:2px solid var(--accent,#333);outline-offset:3px}
+@media (max-width:520px){.mz-frame{width:min(220px,calc(100vw - 96px))}}
+@media (prefers-reduced-motion:reduce){.mz-frame,.mz-mute{transition:none}.mz-mute:hover,.mz-mute:active{transform:none}}
+[data-theme="petalucas"] .mz-mute{background:#fff;color:var(--accent);border-color:var(--line)}

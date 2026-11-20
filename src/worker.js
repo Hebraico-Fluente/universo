@@ -60,7 +60,7 @@ const SECURITY_HEADERS = {
     "img-src 'self' data: https://images.unsplash.com",
     "style-src 'self' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "script-src 'self'",
+    "script-src 'self' https://open.spotify.com",
     "connect-src 'self'",
     "frame-src https://open.spotify.com", // player da música do casal (só depois do clique do visitante)
     "frame-ancestors 'none'",
