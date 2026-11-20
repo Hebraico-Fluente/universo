@@ -252,3 +252,13 @@
   .gifts.rich .gift{grid-template-areas:"ico txt txt" "ico v b";align-items:center;row-gap:12px}
   .gifts.rich .v{justify-self:start}
 }
+
+/* presentes com foto: cartão com a imagem em cima, título e valor + botão embaixo */
+.gifts.photo{grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:18px;border:0}
+.gifts.photo .gift{display:grid;grid-template-rows:auto 1fr auto;align-items:start;gap:0;margin:0;padding:0;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--paper)}
+.gifts.photo .gimg{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:cover;background:var(--paper-2)}
+.gifts.photo .gtxt{padding:16px 18px 6px}
+.gifts.photo .gtxt h3{font-size:20px;line-height:1.15}
+.gifts.photo .v{padding:0 18px;align-self:end}
+.gifts.photo .btn{margin:12px 18px 18px;justify-self:stretch}
+@media (max-width:520px){.gifts.photo{grid-template-columns:1fr 1fr;gap:12px}.gifts.photo .gtxt{padding:12px 12px 4px}.gifts.photo .gtxt h3{font-size:16px}.gifts.photo .v{padding:0 12px;font-size:15px}.gifts.photo .btn{margin:10px 12px 12px;padding-inline:8px}}

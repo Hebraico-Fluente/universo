@@ -87,6 +87,7 @@ const V = {
     const o = { title: str(x.title, { min: 2, max: 80, field: f + " · título" }), cents: int(x.cents ?? 0, { min: 0, max: 10_000_000, field: f + " · valor" }) };
     const ic = icon(x.icon, f); if (ic) o.icon = ic;
     const note = str(x.note, { max: 160, field: f + " · nota" }); if (note) o.note = note;
+    const img = imageUrl(x.image, f + " · foto"); if (img) o.image = img;
     return o;
   }),
   pix_key(v) { v = str(v, { max: 77, field: "Chave Pix" }); if (/\s/.test(v)) fail(400, "Chave Pix: sem espaços", "invalid"); return v; },

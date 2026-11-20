@@ -179,3 +179,7 @@ body>.petals{position:fixed;z-index:90}
 .egg-hint{margin-top:6px;font-size:12px;color:var(--muted)}
 [data-theme="petalucas"] .gave textarea.in{border-radius:18px}
 [data-theme="petalucas"] .gifts.rich h3{line-height:1.02;letter-spacing:.01em}
+[data-theme="petalucas"] .gifts.photo .gift{background:#fff;border-radius:22px}
+[data-theme="petalucas"] .gifts.photo .gtxt h3{font-size:clamp(20px,2vw,24px);line-height:1.05}
+[data-theme="petalucas"] .gifts.photo .v{font:700 18px/1.2 "Quicksand",sans-serif;color:var(--coral)}
+@media (max-width:520px){[data-theme="petalucas"] .gifts.photo .gtxt h3{font-size:18px}[data-theme="petalucas"] .gifts.photo .v{font-size:15px}}
