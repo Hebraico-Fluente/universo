@@ -9,5 +9,12 @@
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none" },
   "d1_databases": [{ "binding": "DB", "database_name": "universo", "migrations_dir": "migrations" }],
   "triggers": { "crons": ["23 6 * * *"] },
+  // Endereços profissionais (a zona guetastudio.com.br está nesta conta; DNS e certificado automáticos)
+  "routes": [
+    { "pattern": "casamento.guetastudio.com.br", "custom_domain": true },
+    { "pattern": "petalaelucas.guetastudio.com.br", "custom_domain": true }
+  ],
+  // hosts que são a própria plataforma (não são domínio de um casal)
+  "vars": { "PLATFORM_HOSTS": "casamento.guetastudio.com.br" },
   "observability": { "enabled": true }
 }
