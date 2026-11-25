@@ -156,7 +156,7 @@ async function petalucas() {
   const o = [], W = "w_petalucas", T = "/assets/themes/petalucas/";
   o.push(ins("weddings", {
     id: W, slug: "petala-e-lucas", names: "Pétala & Lucas", date_iso: "2027-02-20T16:00:00-03:00", city: "Piraquara · PR", universe: "timeless", theme: "petalucas",
-    venue_name: "Estância Dom Raul", hero_image: "", rsvp_deadline: "2027-01-20", is_demo: 0, guestbook: 0, quiz_premio: "Quem ficar em 1º lugar no ranking ganha um cartão fura-fila para o bar da festa!", pix_key: "lucas.medeiros97@gmail.com", pix_name: "Petala e Lucas", pix_city: "Piraquara", map_image: T + "mapa.png",
+    venue_name: "Estância Dom Raul", hero_image: "", rsvp_deadline: "2027-01-20", is_demo: 0, guestbook: 0, quiz_premio: "Quem ficar em 1º lugar no ranking ganha um cartão fura-fila para o bar da festa!", pix_key: "lucas.medeiros97@gmail.com", pix_name: "Petala e Lucas", pix_city: "Piraquara", map_image: T + "mapa.png", og_image: T + "og.jpg",
     welcome: "Casados no cartório desde 2022, decidimos que 2027 seria o ano de comemorar com as pessoas que a gente mais ama.",
     rsvp_note: "Este é um convite individual e intransferível. A festa não comportará crianças. Apenas entrará com nome na lista, ok?",
     story_json: JSON.stringify([

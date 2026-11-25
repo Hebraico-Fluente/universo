@@ -101,7 +101,8 @@ export async function handle(req, env) {
     else if (p === "/painel" || p === "/painel/") asset = "/painel/index.html";
     let priv = false;
     if (!asset) for (const mod of MODS) for (const [re, file, isPrivate] of mod.pages || []) if (!asset && re.test(p)) { asset = file; priv = !!isPrivate; }
-    const res = await env.ASSETS.fetch(new Request(new URL(asset || p, url.origin), req));
+    let res = await env.ASSETS.fetch(new Request(new URL(asset || p, url.origin), req));
+    if (asset === "/casal.html" && res.ok && req.method === "GET") res = await withShareMeta(res, env, url, p);
     return withSecurity(res, asset === "/convite.html" || priv);
   } catch (e) {
     if (e instanceof HttpError) return err(e.status, e.message, e.code);
@@ -109,6 +110,36 @@ export async function handle(req, env) {
     await logServerError(env, req, e); // só rota/tipo/mensagem higienizada, sem dados pessoais
     return err(500, "Erro inesperado. Tente de novo.", "server_error");
   }
+}
+
+// Prévia do link (WhatsApp, Instagram, iMessage): título, descrição e imagem do casal no <head> do site.
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const escAttr = v => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export function shareMeta(w, origin) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(w.date_iso || "");
+  const date = m ? `${+m[3]} de ${MESES[+m[2] - 1]} de ${m[1]}` : "";
+  const place = [w.venue_name, w.city].filter(Boolean).join(" · ");
+  const title = `${w.names} · Vamos nos casar!`;
+  const desc = [date, place].filter(Boolean).join(" · ") + ". Confirme sua presença, veja a nossa história e a lista de presentes.";
+  const img = w.og_image || w.hero_image || "";
+  const abs = img ? (/^https?:\/\//.test(img) ? img : origin + (img.startsWith("/") ? "" : "/") + img) : "";
+  const t = [`<title>${escAttr(title)}</title>`, `<meta name="description" content="${escAttr(desc)}">`,
+    `<meta property="og:type" content="website">`, `<meta property="og:locale" content="pt_BR">`,
+    `<meta property="og:title" content="${escAttr(title)}">`, `<meta property="og:description" content="${escAttr(desc)}">`,
+    `<meta name="twitter:card" content="${abs ? "summary_large_image" : "summary"}">`];
+  if (abs) t.push(`<meta property="og:image" content="${escAttr(abs)}">`, `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`, `<meta property="og:image:alt" content="${escAttr(w.names)}">`, `<meta name="twitter:image" content="${escAttr(abs)}">`);
+  return t.join("\n");
+}
+async function withShareMeta(res, env, url, p) {
+  const slug = (p.match(/^\/c\/([a-z0-9-]{3,60})/) || [])[1];
+  if (!slug) return res;
+  let w = null;
+  try { w = await env.DB.prepare("SELECT names, date_iso, city, venue_name, hero_image, og_image FROM weddings WHERE slug = ?").bind(slug).first(); } catch { return res; }
+  if (!w) return res;
+  const html = (await res.text()).replace(/<title>[^<]*<\/title>/, "").replace("</head>", shareMeta(w, url.origin) + "\n</head>");
+  const h = new Headers(res.headers); h.delete("Content-Length"); h.delete("ETag");
+  return new Response(html, { status: res.status, headers: h });
 }
 
 function withSecurity(res, privatePage) {

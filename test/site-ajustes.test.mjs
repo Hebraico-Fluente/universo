@@ -166,4 +166,17 @@ ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE wedding_id = 'w_demo' A
   ok(viaWorker.status === 206 && viaWorker.headers.get("Content-Range"), "o worker repassa o 206 (cabeçalhos de segurança não quebram o Range)");
 }
 
+/* ---------- prévia do link (WhatsApp) ---------- */
+{
+  const { handle } = await import("../src/worker.js");
+  const r = await handle(new Request("https://universo.test/c/petala-e-lucas"), env);
+  const html = await r.text();
+  ok(r.status === 200 && html.includes('<meta property="og:image" content="https://universo.test/assets/themes/petalucas/og.jpg">'), "site de P&L: og:image absoluta com a imagem da prévia");
+  ok(html.includes("<title>Pétala &amp; Lucas · Vamos nos casar!</title>") && html.includes("20 de fevereiro de 2027 · Estância Dom Raul · Piraquara · PR"), "site de P&L: título e descrição da prévia");
+  ok((html.match(/<title>/g) || []).length === 1, "um título só");
+  ok(fs.existsSync(new URL("../public/assets/themes/petalucas/og.jpg", import.meta.url)), "a imagem da prévia existe");
+  const sql = read("migrations/0091_imagem_de_previa_do_link.sql");
+  ok(sql.includes("og_image") && sql.includes("/assets/themes/petalucas/og.jpg"), "migração 0091 grava a imagem de P&L");
+}
+
 t.done("site-ajustes");
