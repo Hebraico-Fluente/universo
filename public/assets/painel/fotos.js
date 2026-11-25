@@ -46,8 +46,9 @@ async function moderacao(el) {
       <div class="ft-switches">
         ${sw("gallery_on", "Galeria de fotos", "Mostra as fotos aprovadas, organizadas por momento.", !f.galeria)}
         ${sw("uploads_on", "Convidados podem enviar fotos", "Cada foto espera a aprovação de vocês antes de aparecer.", !f.galeria)}
-        ${sw("capsule_on", "Cápsula do tempo", "Mensagens lacradas até o 1º, 5º ou 10º aniversário.", !f.capsula)}
+        ${sw("capsule_on", "Cápsula do tempo", "Mensagens lacradas que abrem 6 meses ou 1 ano depois do casamento.", !f.capsula)}
       </div><p class="ft-msg small muted" id="setMsg" role="status"></p></section>
+    <section class="panel ft-drive" id="ftDrive" aria-labelledby="ftDriveH"><h2 id="ftDriveH">Google Drive</h2><p class="muted small">Carregando…</p></section>
     <section class="ft-mod">
       <div class="ft-mod-h"><h2>Esperando aprovação</h2>${pend.length ? `<div class="ft-bulk" role="group" aria-label="Ações em lote">
         <label class="ft-all"><input type="checkbox" id="selAll"> Selecionar todas</label>
@@ -76,6 +77,35 @@ async function moderacao(el) {
   };
   $$("[data-bulk]", el).forEach(b => b.addEventListener("click", () => run(b.dataset.bulk, picks())));
   $$("[data-one]", el).forEach(b => b.addEventListener("click", () => run(b.dataset.one, [b.dataset.id])));
+  driveCard($("#ftDrive", el)).catch(e => { $("#ftDrive", el).innerHTML = `<h2>Google Drive</h2><p class="error">${esc(e.message)}</p>`; });
+}
+
+/* ---------------- pasta do Google Drive (opcional) ---------------- */
+async function driveCard(box) {
+  const d = await api("/api/admin/midia/drive");
+  const on = !!d.pasta_url;
+  box.innerHTML = `<h2 id="ftDriveH">Google Drive</h2>
+    <p class="ft-drive-st"><span class="tag ${on ? "yes" : "no"}">${on ? "Pasta ligada" : "Sem pasta"}</span>
+      <span>${on ? "No site, o formulário de fotos virou o botão <b>Enviar fotos no Google Drive</b>." : "No site, os convidados mandam fotos pelo formulário (vocês aprovam aqui)."}</span></p>
+    <p>Se preferirem receber as fotos da festa direto no Google Drive, colem aqui o link de uma pasta compartilhada. Com o link preenchido (e “Convidados podem enviar fotos” ligado), a seção de fotos do site troca o formulário de envio por um botão que abre a pasta. As fotos que já estão na galeria continuam lá.</p>
+    <details class="ft-drive-how"><summary>Como compartilhar a pasta</summary><ol>
+      <li>No Google Drive, criem uma <b>subpasta só para isso</b> (por exemplo, “Fotos dos convidados”), longe dos arquivos pessoais de vocês.</li>
+      <li>Botão direito na pasta › <b>Compartilhar</b> › em “Acesso geral”, escolham <b>Qualquer pessoa com o link</b> e o papel <b>Editor</b> (sem isso, ninguém consegue enviar).</li>
+      <li>Toquem em <b>Copiar link</b> e colem abaixo.</li></ol>
+      <p class="small"><b>Atenção:</b> qualquer pessoa com esse link também pode <b>apagar, renomear ou mover</b> os arquivos da pasta. Por isso usem uma pasta separada e, depois da festa, copiem as fotos para outro lugar ou mudem o compartilhamento para “Restrito”. Os convidados precisam estar logados numa conta Google para enviar.</p></details>
+    ${d.can_edit ? `<form class="ft-drive-f" id="driveForm" novalidate>
+      <label class="field"><span>Link da pasta</span><input class="in" name="pasta_url" type="url" inputmode="url" maxlength="300" placeholder="https://drive.google.com/drive/folders/…" value="${esc(d.pasta_url)}"></label>
+      <div class="row-btns"><button class="btn sm" type="submit">Salvar</button>${on ? `<a class="btn ghost sm" href="${esc(d.pasta_url)}" target="_blank" rel="noopener">Abrir a pasta ↗</a><button class="link small danger" type="button" id="driveOff">Tirar o link</button>` : ""}</div>
+      <p class="ft-msg small" id="driveMsg" role="status" aria-live="polite"></p></form>`
+      : `<p class="small muted">Só os noivos podem mudar este link.</p>`}`;
+  const f = $("#driveForm", box);
+  if (!f) return;
+  const save = async v => {
+    try { await api("/api/admin/midia/drive", { method: "PATCH", body: { pasta_url: v } }); await driveCard(box); say($("#driveMsg", box), v ? "Salvo. O site atualiza em até um minuto." : "Link retirado. O site volta a mostrar o formulário."); }
+    catch (e) { say($("#driveMsg", box), e.message, true); }
+  };
+  f.addEventListener("submit", e => { e.preventDefault(); save(f.pasta_url.value.trim()); });
+  $("#driveOff", box)?.addEventListener("click", () => { if (confirm("Tirar o link da pasta? O site volta a mostrar o formulário de envio.")) save(""); });
 }
 
 /* ---------------- galeria ---------------- */
@@ -164,24 +194,24 @@ async function telao(el) {
 async function capsula(el) {
   el.innerHTML = `<p class="muted">Carregando…</p>`;
   const c = await api("/api/admin/capsulas");
-  const total = c.years.reduce((s, y) => s + y.total, 0);
+  const total = c.periods.reduce((s, y) => s + y.total, 0);
   el.innerHTML = `
-    <section class="ft-caps">${c.years.map(y => `<article class="ft-cap${y.sealed ? " sealed" : ""}">
-      <p class="label">${y.years}º aniversário</p><p class="ft-cap-d">${esc(day(y.opens))}</p>
+    <section class="ft-caps">${c.periods.map(y => `<article class="ft-cap${y.sealed ? " sealed" : ""}">
+      <p class="label">${esc(y.label)} depois</p><p class="ft-cap-d">${esc(day(y.opens))}</p>
       <p class="ft-cap-n num">${y.total}<span> ${y.total === 1 ? "cápsula" : "cápsulas"}</span></p>
       <p class="small muted">${y.sealed ? `${y.sealed} ${y.sealed > 1 ? "lacradas" : "lacrada"}${y.opened ? ` · ${y.opened} ${y.opened > 1 ? "abertas" : "aberta"}` : ""}` : y.total ? (y.total > 1 ? "todas abertas" : "aberta") : "nenhuma ainda"}</p></article>`).join("")}</section>
     <section class="panel ft-policy"><h2>Como funciona</h2>
       <p>Convidados deixam mensagens (e, se quiserem, uma foto ou um áudio curto) pelo site, na seção Cápsula do tempo. Cada cápsula fica <b>lacrada até a data escolhida</b>: nem vocês conseguem ler antes. Aqui aparece só quantas existem.</p>
-      <p>No dia, a rotina diária abre as cápsulas daquele aniversário e elas aparecem abaixo, só para vocês dois.</p>
+      <p>Os convidados escolhem entre <b>6 meses</b> e <b>1 ano</b> depois do casamento. No dia, a rotina diária abre as cápsulas daquela data, elas aparecem abaixo só para vocês dois e chega um e-mail avisando.</p>
       <p class="small muted">Guarda: o conteúdo fica guardado enquanto a conta do casamento existir. Depois de abertas, vocês podem exportar tudo (aba Exportar). O lacre é do sistema, não é criptografia: a equipe técnica do serviço tem acesso ao banco de dados, como em qualquer serviço online.</p>
       ${!D.settings.capsule_on ? `<p class="small"><b>A cápsula está desligada no site.</b> Ligue em Moderação.</p>` : ""}
     </section>
     ${!c.can_read ? `<p class="muted">Só os noivos leem as cápsulas abertas.</p>` : c.opened.length ? `<h2 class="ft-h2">Cápsulas abertas</h2><ul class="ft-opened">${c.opened.map(o => `<li class="ft-letter">
-      <p class="label">${o.years}º aniversário · aberta em ${esc(when(o.opened_at))}</p>
+      <p class="label">${esc(o.label)} depois · aberta em ${esc(when(o.opened_at))}</p>
       <div class="ft-letter-b">${paras(o.message)}</div>
       ${o.media ? (o.media.type.startsWith("audio/") ? `<audio controls preload="none" src="${esc(o.media.url)}" aria-label="Áudio de ${esc(o.author)}"></audio>` : `<img src="${esc(o.media.url)}" alt="Foto deixada por ${esc(o.author)}" loading="lazy">`) : ""}
       <p class="ft-sign">${esc(o.author)} <span class="small muted">· escrita em ${esc(when(o.created_at))}</span></p>
-      <button class="link small danger" type="button" data-cdel="${esc(o.id)}">Apagar</button></li>`).join("")}</ul>` : total ? `<p class="ft-empty muted">Nenhuma cápsula aberta ainda. A primeira data é ${esc(day(c.years.find(y => y.sealed)?.opens || c.years[0].opens))}.</p>` : ""}`;
+      <button class="link small danger" type="button" data-cdel="${esc(o.id)}">Apagar</button></li>`).join("")}</ul>` : total ? `<p class="ft-empty muted">Nenhuma cápsula aberta ainda. A primeira data é ${esc(day(c.periods.find(y => y.sealed)?.opens || c.periods[0].opens))}.</p>` : ""}`;
   $$("[data-cdel]", el).forEach(b => b.addEventListener("click", async () => {
     if (!confirm("Apagar esta cápsula aberta? Exporte antes se quiser guardar.")) return;
     try { await api(`/api/admin/capsulas/${b.dataset.cdel}`, { method: "DELETE" }); capsula(el); } catch (x) { alert(x.message); }
@@ -318,7 +348,7 @@ async function exportar(el) {
       const txt = (name, s) => entries.push({ name: uniq(name), data: new TextEncoder().encode(s) });
       for (const k of m.memories) txt(`memorias/${clean(k.title)}.txt`, `${k.title}\n\n${k.body || ""}${k.media_id ? `\n\nArquivo: ${path[k.media_id] || ""}` : ""}\n`);
       for (const k of m.legacy) txt(`legado/${clean(k.title)}.txt`, `${k.title}\n\n${k.body || ""}${k.media_id ? `\n\nArquivo: ${path[k.media_id] || ""}` : ""}\n`);
-      for (const c of m.capsules.opened) txt(`capsulas/${c.years}-anos - ${clean(c.author)}.txt`, `De: ${c.author}\nEscrita em: ${c.created_at}\nAberta em: ${c.opened_at}\n\n${c.message}${c.media_id ? `\n\nAnexo: ${path[c.media_id] || ""}` : ""}\n`);
+      for (const c of m.capsules.opened) txt(`capsulas/${c.months}-meses - ${clean(c.author)}.txt`, `De: ${c.author}\nEscrita em: ${c.created_at}\nAberta em: ${c.opened_at}\n\n${c.message}${c.media_id ? `\n\nAnexo: ${path[c.media_id] || ""}` : ""}\n`);
       if (m.settings.timeline.length) txt("memorias/linha-do-tempo.txt", m.settings.timeline.map(t => `${t.time}  ${t.title}${t.text ? " — " + t.text : ""}`).join("\n") + "\n");
       txt("dados.json", JSON.stringify(m, null, 2));
       txt("leia-me.txt", `${m.wedding.names}\nExportado em ${new Date().toLocaleString("pt-BR")} pelo Universo.\n\nPastas: galeria (por momento), memorias, legado, capsulas (só as já abertas), site e arquivos.\ndados.json tem a lista completa, com legendas, momentos, quem enviou e datas.\n${m.capsules.sealed.length ? `\nCápsulas ainda lacradas (não incluídas): ${m.capsules.sealed.map(s => `${s.count} para ${s.opens}`).join(", ")}.\n` : ""}`);

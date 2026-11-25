@@ -95,3 +95,12 @@ kbd{display:inline-block;padding:1px 7px;border:1px solid var(--line);border-bot
 .ft-exp{display:grid;gap:14px}
 .ft-exp progress{width:100%;height:8px;accent-color:var(--accent)}
 .ft-exp progress[hidden]{display:none}
+
+/* ---------- pasta do Google Drive ---------- */
+.ft-drive{display:grid;gap:12px}
+.ft-drive h2{margin-bottom:0}
+.ft-drive-st{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.ft-drive-how ol{margin:10px 0;padding-left:1.3em;display:grid;gap:6px}
+.ft-drive-how summary{cursor:pointer;font-weight:600}
+.ft-drive-f{display:grid;gap:10px;max-width:640px}
+.ft-drive-f .row-btns{display:flex;flex-wrap:wrap;align-items:center;gap:10px}

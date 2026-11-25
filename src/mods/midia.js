@@ -10,7 +10,8 @@
  *
  * Site (públicas: mesma origem + limite por IP/aparelho + validação)
  *   POST /api/site/:slug/fotos          multipart: file, author?, consent=1   → foto pendente
- *   POST /api/site/:slug/capsula        multipart: author, message, years (1|5|10), consent=1, file? (foto/áudio)
+ *   POST /api/site/:slug/capsula        multipart: author, message, months (6|12), consent=1, file? (foto/áudio)
+ *                                       (years=1 de páginas antigas em cache vira months=12; 5 e 10 anos não são mais aceitos)
  *   GET  /api/telao/:token              fotos e recados aprovados para o telão (token só por hash)
  *
  * Painel
@@ -21,6 +22,10 @@
  *   GET  /api/admin/capsulas (contagem por data; conteúdo só das abertas e só para o casal) · DELETE /api/admin/capsulas/:id (só abertas)
  *   GET  /api/admin/lembrancas?area=memory|legacy · POST · PATCH|DELETE /api/admin/lembrancas/:id
  *   GET  /api/admin/midia/export        lista de arquivos (URL + metadados) e textos, para o .zip montado no navegador
+ *
+ * Pasta do Google Drive (guia em docs/drive-fotos/LEIA-ME.md)
+ *   GET|PATCH /api/admin/midia/drive    {pasta_url} — só os noivos (owner) editam. Preenchida, o site troca o
+ *                                       formulário de envio de fotos por um botão que abre a pasta (nova aba).
  */
 import { json, err, fail, str, int, oneOf, body, randomToken, uid, sha256, rateLimit, clientIp, audit, parseJson } from "../lib.js";
 import { featureOn } from "./plataforma.js";
@@ -34,21 +39,32 @@ export const MOMENTS = [
   ["festa", "Festa"], ["ensaio", "Ensaio do casal"], ["outros", "Outros momentos"],
 ];
 const MOMENT_KEYS = MOMENTS.map(m => m[0]);
-const YEARS = [1, 5, 10];
+/** Quando a cápsula abre, em meses depois do casamento. Cápsulas antigas de 5 e 10 anos (60/120) continuam valendo. */
+export const MONTHS = [6, 12];
+/** "6 meses", "1 ano", "5 anos"… */
+export const periodLabel = m => m % 12 ? `${m} ${m === 1 ? "mês" : "meses"}` : `${m / 12} ${m === 12 ? "ano" : "anos"}`;
+/** Meses de uma cápsula (linhas anteriores à migração 0078 só têm `years`). */
+export const monthsOf = c => Number(c.months) || Number(c.years) * 12;
 const MEMORY_KINDS = ["vow", "speech", "other"], LEGACY_KINDS = ["letter", "vow", "audio", "tradition", "other"];
 const LIMITS = { photoIp: 40, photoDevice: 15, capsuleIp: 10, wallIp: 600 };
 
 /* ---------------- datas (fuso de Brasília, sem horário de verão) ---------------- */
 export const todaySP = (now = new Date()) => new Date(now.getTime() - 3 * 3600e3).toISOString().slice(0, 10);
 const dayOf = w => String(w.date_iso || "").slice(0, 10);
-/** Mesma data N anos depois (29/02 vira 28/02 em ano não bissexto). */
-export function addYears(day, n) {
+/**
+ * Mesmo dia N meses depois. Se o mês de destino é mais curto, vale o último dia dele
+ * (31/08 + 6 meses → 28/02, ou 29/02 em ano bissexto; 29/02 + 12 meses → 28/02).
+ */
+export function addMonths(day, n) {
   const [y, m, d] = day.split("-").map(Number);
-  const leap = x => (x % 4 === 0 && x % 100 !== 0) || x % 400 === 0;
-  const dd = m === 2 && d === 29 && !leap(y + n) ? 28 : d;
-  return `${y + n}-${String(m).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  const t = y * 12 + (m - 1) + n, ty = Math.floor(t / 12), tm = t % 12 + 1;
+  const last = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  return `${ty}-${String(tm).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
 }
+/** Mesma data N anos depois (29/02 vira 28/02 em ano não bissexto). */
+export const addYears = (day, n) => addMonths(day, 12 * n);
 /** Depois do casamento? Hoje é aniversário (e de quantos anos)? */
+export { dayOf };
 export function phase(w, today = todaySP()) {
   const day = dayOf(w);
   const years = Number(today.slice(0, 4)) - Number(day.slice(0, 4));
@@ -144,9 +160,11 @@ async function guestCapsule(ctx, slug) {
   if (f.get("consent") !== "1") fail(400, "Confirme que entendeu como a cápsula funciona.", "consent");
   const author = str(f.get("author"), { min: 2, max: 60, field: "Seu nome" });
   const message = longText(f.get("message"), { min: 2, max: 3000, field: "Mensagem" });
-  const years = int(f.get("years"), { min: 1, max: 10, field: "Quando abrir" });
-  if (!YEARS.includes(years)) fail(400, "Quando abrir: escolha 1, 5 ou 10 anos", "invalid");
-  const opens = addYears(dayOf(w), years);
+  // novo: months (6|12); páginas antigas ainda em cache mandam years=1 (= 12 meses). 5 e 10 anos não são mais oferecidos.
+  const months = f.get("months") != null && f.get("months") !== "" ? int(f.get("months"), { min: 1, max: 120, field: "Quando abrir" })
+    : f.get("years") === "1" ? 12 : 0;
+  if (!MONTHS.includes(months)) fail(400, "Quando abrir: escolha daqui a 6 meses ou daqui a 1 ano", "invalid");
+  const opens = addMonths(dayOf(w), months);
   if (opens <= todaySP()) fail(400, "Essa data já passou. Escolha um aniversário mais adiante.", "past");
   const file = f.get("file");
   let media = null;
@@ -155,7 +173,8 @@ async function guestCapsule(ctx, slug) {
     if (!t.startsWith("image/") && !t.startsWith("audio/")) fail(415, "Junte uma foto ou um áudio.", "bad_type");
     media = await putFile(env, w.id, { bytes: await file.arrayBuffer(), type: t, name: file.name || (t.startsWith("audio/") ? "audio" : "foto"), kind: "capsule", maxBytes: t.startsWith("audio/") ? 6 * MB : 8 * MB });
   }
-  await env.DB.prepare("INSERT INTO capsules (id, wedding_id, author, message, media_id, years) VALUES (?, ?, ?, ?, ?, ?)").bind(uid("cp_"), w.id, author, message, media?.id || null, years).run();
+  // `years` = 1 só para o CHECK antigo da coluna; quem manda é `months` (migração 0078)
+  await env.DB.prepare("INSERT INTO capsules (id, wedding_id, author, message, media_id, years, months) VALUES (?, ?, ?, ?, ?, 1, ?)").bind(uid("cp_"), w.id, author, message, media?.id || null, months).run();
   return json({ ok: true, opens }, 201);
 }
 
@@ -177,9 +196,9 @@ async function wall(ctx, token) {
 /* ---------------- cápsulas: abertura ---------------- */
 /** Abre as cápsulas cuja data chegou (de um casamento ou de todos). Devolve quantas abriu. */
 export async function openDue(env, today, W = null) {
-  const rows = (await env.DB.prepare(`SELECT c.id, c.years, w.date_iso FROM capsules c JOIN weddings w ON w.id = c.wedding_id WHERE c.opened_at IS NULL${W ? " AND c.wedding_id = ?" : ""}`)
+  const rows = (await env.DB.prepare(`SELECT c.id, c.years, c.months, w.date_iso FROM capsules c JOIN weddings w ON w.id = c.wedding_id WHERE c.opened_at IS NULL${W ? " AND c.wedding_id = ?" : ""}`)
     .bind(...(W ? [W] : [])).all()).results;
-  const due = rows.filter(r => addYears(dayOf(r), r.years) <= today).map(r => r.id);
+  const due = rows.filter(r => addMonths(dayOf(r), monthsOf(r)) <= today).map(r => r.id);
   for (let i = 0; i < due.length; i += 50) {
     const part = due.slice(i, i + 50);
     await env.DB.prepare(`UPDATE capsules SET opened_at = datetime('now') WHERE opened_at IS NULL AND id IN (${inList(part.length)})`).bind(...part).run();
@@ -319,17 +338,38 @@ async function newWall(ctx) {
   return json({ link: url.origin + "/telao/" + token }, 201);
 }
 
+/* ---------------- pasta do Google Drive ---------------- */
+/** Link de compartilhamento de pasta: https://drive.google.com/drive/folders/<id> (opcionalmente /u/N/ e ?usp=…). */
+export const DRIVE_FOLDER_RE = /^https:\/\/drive\.google\.com\/drive\/(?:u\/\d\/)?folders\/[A-Za-z0-9_-]{10,200}(?:\?usp=[A-Za-z0-9_]{1,40})?$/;
+const driveFolder = async (env, W) => (await env.DB.prepare("SELECT drive_pasta_url FROM media_settings WHERE wedding_id = ?").bind(W).first())?.drive_pasta_url || "";
+async function driveAdmin(ctx) {
+  const { env, W, s, p, m, req } = ctx;
+  if (p !== "/api/admin/midia/drive") return null;
+  if (m === "GET") return json({ pasta_url: await driveFolder(env, W), can_edit: s.role === "owner" });
+  if (m === "PATCH") {
+    ownerOnly(s);
+    const u = str((await body(req, 4000)).pasta_url, { max: 300, field: "Link da pasta" });
+    if (u && !DRIVE_FOLDER_RE.test(u)) fail(400, "Link da pasta: use o link de compartilhamento da pasta (https://drive.google.com/drive/folders/…)", "invalid");
+    await env.DB.prepare("INSERT INTO media_settings (wedding_id, drive_pasta_url) VALUES (?, ?) ON CONFLICT(wedding_id) DO UPDATE SET drive_pasta_url = excluded.drive_pasta_url, updated_at = datetime('now')").bind(W, u).run();
+    await audit(env, W, ctx.actor, u ? "drive.folder.set" : "drive.folder.clear");
+    return json({ pasta_url: u, can_edit: true });
+  }
+  return null;
+}
+
 async function capsulesAdmin(ctx) {
   const { env, W, s } = ctx;
   await openDue(env, todaySP(), W); // se a rotina diária ainda não passou hoje
   const w = await env.DB.prepare("SELECT date_iso, features_json FROM weddings WHERE id = ?").bind(W).first();
-  const counts = (await env.DB.prepare("SELECT years, COUNT(*) AS n, COALESCE(SUM(opened_at IS NOT NULL), 0) AS opened FROM capsules WHERE wedding_id = ? GROUP BY years").bind(W).all()).results;
-  const byYear = YEARS.map(y => { const c = counts.find(x => x.years === y) || { n: 0, opened: 0 }; return { years: y, opens: addYears(dayOf(w), y), total: c.n, opened: c.opened, sealed: c.n - c.opened }; });
+  const counts = (await env.DB.prepare("SELECT COALESCE(months, years * 12) AS months, COUNT(*) AS n, COALESCE(SUM(opened_at IS NOT NULL), 0) AS opened FROM capsules WHERE wedding_id = ? GROUP BY 1").bind(W).all()).results;
+  // sempre 6 meses e 1 ano; 5 e 10 anos só aparecem se houver cápsulas antigas guardadas para essas datas
+  const all = [...new Set([...MONTHS, ...counts.map(c => c.months)])].sort((a, b) => a - b);
+  const periods = all.map(mo => { const c = counts.find(x => x.months === mo) || { n: 0, opened: 0 }; return { months: mo, label: periodLabel(mo), opens: addMonths(dayOf(w), mo), total: c.n, opened: c.opened, sealed: c.n - c.opened }; });
   const canRead = s.role === "owner";
-  const opened = canRead ? (await env.DB.prepare(`SELECT c.id, c.author, c.message, c.years, c.opened_at, c.created_at, c.media_id, m.type AS media_type
-    FROM capsules c LEFT JOIN media m ON m.id = c.media_id WHERE c.wedding_id = ? AND c.opened_at IS NOT NULL ORDER BY c.years, c.created_at`).bind(W).all()).results
-    .map(c => ({ ...c, media: c.media_id ? { url: mediaUrl(c.media_id), type: c.media_type } : null })) : [];
-  return json({ feature: featureOn(w, "capsula"), years: byYear, opened, can_read: canRead });
+  const opened = canRead ? (await env.DB.prepare(`SELECT c.id, c.author, c.message, COALESCE(c.months, c.years * 12) AS months, c.opened_at, c.created_at, c.media_id, m.type AS media_type
+    FROM capsules c LEFT JOIN media m ON m.id = c.media_id WHERE c.wedding_id = ? AND c.opened_at IS NOT NULL ORDER BY 4, c.created_at`).bind(W).all()).results
+    .map(({ media_type, ...c }) => ({ ...c, label: periodLabel(c.months), media: c.media_id ? { url: mediaUrl(c.media_id), type: media_type } : null })) : [];
+  return json({ feature: featureOn(w, "capsula"), periods, opened, can_read: canRead });
 }
 async function deleteCapsule(ctx, id) {
   const { env, W } = ctx;
@@ -398,12 +438,13 @@ async function exportManifest(env, W, role) {
     .filter(f => !sealed.includes(f.id) && (owner || (f.kind !== "legacy" && f.kind !== "capsule")))
     .map(f => ({ ...f, public: !!f.public, url: mediaUrl(f.id) }));
   const gallery = (await env.DB.prepare("SELECT id, media_id, moment, caption, author, source, status, created_at FROM gallery_photos WHERE wedding_id = ? ORDER BY created_at").bind(W).all()).results;
-  const caps = (await env.DB.prepare("SELECT id, author, message, media_id, years, opened_at, created_at FROM capsules WHERE wedding_id = ?").bind(W).all()).results;
+  const caps = (await env.DB.prepare("SELECT id, author, message, media_id, COALESCE(months, years * 12) AS months, opened_at, created_at FROM capsules WHERE wedding_id = ?").bind(W).all()).results;
   return {
     exported_at: new Date().toISOString(), wedding: w, storage: mode(env),
     files, gallery,
     capsules: {
-      sealed: YEARS.map(y => ({ years: y, opens: addYears(dayOf(w), y), count: caps.filter(c => c.years === y && !c.opened_at).length })).filter(x => x.count),
+      sealed: [...new Set(caps.filter(c => !c.opened_at).map(c => c.months))].sort((a, b) => a - b)
+        .map(mo => ({ months: mo, label: periodLabel(mo), opens: addMonths(dayOf(w), mo), count: caps.filter(c => c.months === mo && !c.opened_at).length })),
       opened: owner ? caps.filter(c => c.opened_at) : [],
       note: "Cápsulas lacradas não entram na exportação até a data de abertura.",
     },
@@ -456,6 +497,7 @@ export default {
       if (m === "POST") return newWall(ctx);
       if (m === "DELETE") { await env.DB.prepare("UPDATE media_walls SET token_hash = NULL WHERE wedding_id = ?").bind(W).run(); await audit(env, W, ctx.actor, "wall.revoke"); return json({ ok: true }); }
     }
+    if (p.startsWith("/api/admin/midia/drive")) return driveAdmin(ctx);
     if (p === "/api/admin/capsulas" && m === "GET") return capsulesAdmin(ctx);
     if ((r = p.match(/^\/api\/admin\/capsulas\/([\w-]{2,40})$/)) && m === "DELETE") return deleteCapsule(ctx, r[1]);
     if (p === "/api/admin/lembrancas") {
@@ -481,8 +523,9 @@ export default {
         .map(p => ({ url: mediaUrl(p.media_id), moment: p.moment, caption: p.caption }))
       : [];
     if (gal && (s.gallery_on || s.uploads_on || (ph.after && s.memories_on)))
-      out.gallery = { show: s.gallery_on || (ph.after && s.memories_on), uploads: s.uploads_on, moments: MOMENTS.map(([key, label]) => ({ key, label })), photos: approved };
-    if (cap && s.capsule_on) out.capsule = { opens: Object.fromEntries(YEARS.map(y => [y, addYears(dayOf(w), y)])), today: todaySP() };
+      out.gallery = { show: s.gallery_on || (ph.after && s.memories_on), uploads: s.uploads_on, moments: MOMENTS.map(([key, label]) => ({ key, label })), photos: approved,
+        drive_folder: s.uploads_on ? await driveFolder(env, w.id) : "" }; // preenchida: o site mostra o botão da pasta no lugar do formulário
+    if (cap && s.capsule_on) out.capsule = { options: MONTHS.map(mo => ({ months: mo, label: periodLabel(mo), opens: addMonths(dayOf(w), mo) })), today: todaySP() };
     if (ph.after && s.memories_on) {
       const items = (await keepsakesList(env, w.id, "memory")).map(k => ({ kind: k.kind, title: k.title, body: k.body, media: k.media ? { url: k.media.url, type: k.media.type } : null }));
       out.memories = { playlist_url: s.playlist_url, timeline: s.timeline, items };
@@ -502,7 +545,8 @@ export default {
   async exportData(env, W) {
     const m = await exportManifest(env, W, "planner");
     const legacy = (await env.DB.prepare("SELECT COUNT(*) AS n FROM keepsakes WHERE wedding_id = ? AND area = 'legacy'").bind(W).first()).n;
-    return { ...m, legacy_count: legacy, legacy_note: "O legado (só dos noivos) é exportado pela aba Fotos e memórias." };
+    return { ...m, legacy_count: legacy, legacy_note: "O legado (só dos noivos) é exportado pela aba Fotos e memórias.",
+      drive_note: "Fotos enviadas pela pasta do Google Drive do casal ficam no Drive deles (fora deste serviço), sob controle do próprio casal." };
   },
 
   async cron(env, now) { await openDue(env, todaySP(now)); },

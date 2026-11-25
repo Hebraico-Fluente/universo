@@ -15,6 +15,8 @@
     { "pattern": "petalaelucas.guetastudio.com.br", "custom_domain": true }
   ],
   // hosts que são a própria plataforma (não são domínio de um casal)
-  "vars": { "PLATFORM_HOSTS": "casamento.guetastudio.com.br" },
+  // MAIL_FROM: remetente dos e-mails (domínio verificado na Resend). A chave RESEND_API_KEY é SEGREDO, só no painel da Cloudflare.
+  // PANEL_ORIGIN: endereço do painel nos links dos e-mails.
+  "vars": { "PLATFORM_HOSTS": "casamento.guetastudio.com.br", "MAIL_FROM": "Gueta Studio <casamentos@guetastudio.com.br>", "PANEL_ORIGIN": "https://casamento.guetastudio.com.br" },
   "observability": { "enabled": true }
 }

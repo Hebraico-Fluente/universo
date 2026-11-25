@@ -2,7 +2,7 @@
 import zlib from "node:zlib";
 import { setup, O } from "./helpers.mjs";
 import { handle, runCron } from "../src/worker.js";
-import midia, { addYears, todaySP, phase } from "../src/mods/midia.js";
+import midia, { addYears, addMonths, todaySP, phase } from "../src/mods/midia.js";
 import { CHUNK } from "../src/mods/midia/store.js";
 import { DEMO } from "../scripts/seed.mjs";
 
@@ -44,6 +44,8 @@ const other = (await t.login(DEMO.other.email, DEMO.other.password, "10.0.0.8"))
 
 /* ---------- datas ---------- */
 ok(addYears("2027-10-16", 1) === "2028-10-16" && addYears("2028-02-29", 1) === "2029-02-28" && addYears("2028-02-29", 4) === "2032-02-29", "aniversário: mesma data N anos depois (29/02 → 28/02)");
+ok(addMonths("2027-10-16", 6) === "2028-04-16" && addMonths("2027-08-31", 6) === "2028-02-29" && addMonths("2026-08-31", 6) === "2027-02-28"
+  && addMonths("2027-12-31", 6) === "2028-06-30" && addMonths("2028-02-29", 12) === "2029-02-28" && addMonths("2027-01-31", 1) === "2027-02-28", "meses: fim de mês vira o último dia do mês de destino");
 ok(phase({ date_iso: "2027-10-16T16:30:00-03:00" }, "2029-10-16").anniversary === 2 && !phase({ date_iso: "2027-10-16T16:30:00-03:00" }, "2027-10-16").after, "fase: aniversário e depois da data");
 
 /* ---------- upload válido ---------- */
@@ -176,43 +178,50 @@ ok((await t.json("GET", "/api/telao/" + tok2, null, { ck: "" })).status === 404,
 
 /* ---------- cápsula do tempo ---------- */
 const capPost = (fields, opts = {}) => send("POST", `/api/site/${SLUG}/capsula`, form(fields), { ck: "", ip: opts.ip || "10.3.0.1", origin: opts.origin ?? O });
-r = await capPost({ author: "Primo Davi", message: "Oi", years: "1", consent: "1" });
+r = await capPost({ author: "Primo Davi", message: "Oi", months: "6", consent: "1" });
 ok(r.status === 404, "cápsula fechada até o casal ligar");
 await t.json("PATCH", "/api/admin/midia/ajustes", { capsule_on: true });
 site = await (await send("GET", `/api/site/${SLUG}`, undefined, { ck: "" })).json();
-ok(site.mods.midia.capsule.opens[1] === "2028-10-16" && site.mods.midia.capsule.opens[10] === "2037-10-16", "site informa as datas de abertura (1º, 5º, 10º aniversário)");
-r = await capPost({ author: "Primo Davi", message: "Daqui a um ano\n\nlembrem do bolo!", years: "3", consent: "1" });
-ok(r.status === 400, "só 1, 5 ou 10 anos");
-r = await capPost({ author: "Primo Davi", message: "Oi de novo", years: "1" });
+{ const o = site.mods.midia.capsule.options;
+  ok(o.length === 2 && o[0].months === 6 && o[0].label === "6 meses" && o[0].opens === "2028-04-16" && o[1].months === 12 && o[1].label === "1 ano" && o[1].opens === "2028-10-16", "site oferece só 6 meses e 1 ano, com as datas"); }
+r = await capPost({ author: "Primo Davi", message: "Daqui a um ano\n\nlembrem do bolo!", months: "3", consent: "1" });
+ok(r.status === 400, "só 6 ou 12 meses");
+r = await capPost({ author: "Primo Davi", message: "Daqui a cinco anos", years: "5", consent: "1" });
+ok(r.status === 400, "5 e 10 anos não são mais aceitos em cápsulas novas");
+r = await capPost({ author: "Primo Davi", message: "Oi de novo", months: "6" });
 ok(r.status === 400, "cápsula sem consentimento → 400");
-r = await capPost({ author: "Primo Davi", message: "Daqui a um ano\n\nlembrem do bolo!", years: "1", consent: "1", file: WEBM, __type: "audio/webm", __name: "audio.webm" });
-ok(r.status === 201 && (await r.json()).opens === "2028-10-16", "convidado deixa cápsula com áudio para o 1º aniversário");
-r = await capPost({ author: "Madrinha Bia", message: "Para daqui a cinco anos.", years: "5", consent: "1", file: png(), __type: "image/png" });
-ok(r.status === 201, "cápsula com foto para o 5º aniversário");
+r = await capPost({ author: "Primo Davi", message: "Daqui a seis meses\n\nlembrem do bolo!", months: "6", consent: "1", file: WEBM, __type: "audio/webm", __name: "audio.webm" });
+ok(r.status === 201 && (await r.json()).opens === "2028-04-16", "convidado deixa cápsula com áudio para daqui a 6 meses");
+r = await capPost({ author: "Madrinha Bia", message: "Para daqui a um ano.", years: "1", consent: "1", file: png(), __type: "image/png" });
+ok(r.status === 201 && (await r.json()).opens === "2028-10-16", "página antiga em cache (years=1) vira cápsula de 1 ano");
+ok(db.prepare("SELECT months FROM capsules WHERE wedding_id = 'w_demo' AND author = 'Madrinha Bia'").get().months === 12, "cápsula nova guarda months");
+// cápsula antiga, de antes da migração 0078: 5 anos (years = 5 → months = 60) continua valendo
+db.prepare("INSERT INTO capsules (id, wedding_id, author, message, years, months) VALUES ('cp_antiga', 'w_demo', 'Tia Rosa', 'Carta para daqui a cinco anos', 5, 60)").run();
 r = await capPost({ author: "Alguém", message: "arquivo errado", years: "1", consent: "1", file: withHead([0x25, 0x50, 0x44, 0x46, 0x2d], 200), __type: "application/pdf", __name: "x.pdf" });
 ok(r.status === 415, "cápsula aceita só foto ou áudio");
-const capMedia = db.prepare("SELECT media_id FROM capsules WHERE wedding_id = 'w_demo' AND years = 1").get().media_id;
+const capMedia = db.prepare("SELECT media_id FROM capsules WHERE wedding_id = 'w_demo' AND months = 6").get().media_id;
 let caps = (await t.json("GET", "/api/admin/capsulas")).body;
-ok(caps.years.find(y => y.years === 1).sealed === 1 && caps.years.find(y => y.years === 5).sealed === 1 && caps.opened.length === 0 && !JSON.stringify(caps).includes("bolo"), "painel mostra só quantas cápsulas há por data (conteúdo lacrado)");
+const per = (c, mo) => c.periods.find(y => y.months === mo);
+ok(per(caps, 6).sealed === 1 && per(caps, 12).sealed === 1 && per(caps, 60).sealed === 1 && per(caps, 60).label === "5 anos" && caps.periods.length === 3 && caps.opened.length === 0 && !JSON.stringify(caps).includes("bolo"), "painel mostra só quantas cápsulas há por data (conteúdo lacrado)");
 r = await send("GET", "/api/media/" + capMedia, undefined, { ck: demoCk });
 ok(r.status === 404, "nem o casal abre o áudio de uma cápsula lacrada");
 r = await send("DELETE", "/api/admin/media/" + capMedia, undefined, { ck: demoCk });
 ok(r.status === 409, "arquivo de cápsula lacrada não pode ser apagado");
 let exp = (await t.json("GET", "/api/admin/midia/export")).body;
-ok(!exp.files.some(f => f.id === capMedia) && !JSON.stringify(exp).includes("bolo") && exp.capsules.sealed.length === 2, "exportação não inclui cápsulas lacradas (só a contagem)");
-await runCron(env, new Date("2028-10-15T12:00:00Z"));
+ok(!exp.files.some(f => f.id === capMedia) && !JSON.stringify(exp).includes("bolo") && exp.capsules.sealed.length === 3, "exportação não inclui cápsulas lacradas (só a contagem)");
+await runCron(env, new Date("2028-04-15T12:00:00Z"));
 ok((await t.json("GET", "/api/admin/capsulas")).body.opened.length === 0, "rotina diária na véspera não abre nada");
-await runCron(env, new Date("2028-10-16T12:00:00Z"));
+await runCron(env, new Date("2028-04-16T12:00:00Z"));
 caps = (await t.json("GET", "/api/admin/capsulas")).body;
 const c1 = caps.opened[0];
-ok(caps.opened.length === 1 && c1.message.includes("bolo") && c1.message.includes("\n") && c1.media?.type === "audio/webm" && caps.years.find(y => y.years === 5).sealed === 1, "rotina diária no 1º aniversário abre só as cápsulas de 1 ano");
+ok(caps.opened.length === 1 && c1.message.includes("bolo") && c1.message.includes("\n") && c1.media?.type === "audio/webm" && c1.months === 6 && per(caps, 12).sealed === 1 && per(caps, 60).sealed === 1, "rotina diária aos 6 meses abre só as cápsulas de 6 meses");
 r = await send("GET", c1.media.url.replace("/m/", "/api/media/"), undefined, { ck: demoCk });
 ok(r.status === 200 && r.headers.get("Content-Type") === "audio/webm", "depois de aberta, o casal ouve o áudio");
 r = await send("GET", c1.media.url.replace("/m/", "/api/media/"), undefined, { ck: other });
 ok(r.status === 404, "outro casal não ouve o áudio da cápsula");
 ok((await t.json("GET", "/api/admin/capsulas", null, { ck: other })).body.opened.length === 0, "outro casal não vê cápsulas alheias");
 exp = (await t.json("GET", "/api/admin/midia/export")).body;
-ok(exp.capsules.opened.length === 1 && exp.files.some(f => f.id === capMedia) && exp.capsules.sealed.length === 1, "exportação inclui a cápsula aberta e o arquivo dela");
+ok(exp.capsules.opened.length === 1 && exp.files.some(f => f.id === capMedia) && exp.capsules.sealed.length === 2, "exportação inclui a cápsula aberta e o arquivo dela");
 
 /* ---------- memórias, legado e aniversário ---------- */
 const setDate = d => db.prepare("UPDATE weddings SET date_iso = ? WHERE id = 'w_demo'").run(d + "T16:30:00-03:00");

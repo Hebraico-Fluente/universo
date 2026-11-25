@@ -49,7 +49,9 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
   const html = [];
 
   if (w.story.length) html.push(sec("historia", "Nossa história", "Como chegamos <em>até aqui</em>",
-    `<ol class="story${w.story.some(s => s.image) ? "" : " no-img"}">${w.story.map(s => `<li class="chapter rv">${s.image ? `<figure data-bg="${esc(s.image)}"></figure>` : ""}<div class="txt"><span class="yr num">${esc(s.year)}</span><h3>${esc(s.title)}</h3><p>${esc(s.text)}</p></div></li>`).join("")}</ol>`));
+    `<ol class="story${w.story.some(s => s.image || s.video) ? "" : " no-img"}">${w.story.map(s => `<li class="chapter rv">${s.video
+      ? `<figure class="vid"><video controls playsinline preload="metadata" src="${esc(s.video)}"${s.poster ? ` poster="${esc(s.poster)}"` : ""} aria-label="${esc(s.alt || s.title)}"></video></figure>`
+      : s.image ? `<figure data-bg="${esc(s.image)}" role="img" aria-label="${esc(s.alt || `Foto do capítulo ${s.year}`)}"></figure>` : ""}<div class="txt">${s.year ? `<span class="yr num">${esc(s.year)}</span>` : ""}<h3>${esc(s.title)}</h3>${s.text ? `<p>${esc(s.text)}</p>` : ""}</div></li>`).join("")}</ol>`));
 
   if (w.quiz.length) html.push(sec("quiz", "Quiz", "Quanto você conhece <em>o casal?</em>",
     `<div class="quiz rv" id="quizBox" aria-live="polite"></div>`));
@@ -109,7 +111,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
         ${logo ? `<h1 class="names logo-names">${logo}</h1>` : `<h1 class="names"><span>${esc(a)}</span><i>&amp;</i><span>${esc(b)}</span></h1>`}
         <p class="hero-date">${esc(longDate(w.date))}<span class="dot">·</span>${esc(w.venue_name ? w.venue_name + " · " + w.city : w.city)}</p>
         <div class="cd" id="cd" aria-label="Contagem regressiva"></div>
-        <div class="hero-acts"><a class="btn accent" href="#presenca">Confirmar presença</a>${w.story.length ? `<a class="btn ghost" href="#historia">Nossa história</a>` : ""}
+        <div class="hero-acts">${w.story.length ? `<a class="btn ghost" href="#historia">Nossa história</a>` : ""}
           <details class="addcal"><summary class="btn ghost">${icon("calendar")}Salvar na agenda</summary>
             <div class="addcal-menu"><a href="${esc(googleCal(w, events))}" target="_blank" rel="noopener">Google Agenda</a><a href="/c/${esc(w.slug)}/agenda.ics">iPhone, Outlook e outros</a></div></details></div>
         ${w.welcome ? `<p class="welcome">${esc(w.welcome)}</p>` : ""}
@@ -224,15 +226,30 @@ function parseCents(v) {
 }
 
 /** Quiz "Quanto você conhece o casal?" — nome primeiro (ranking), uma pergunta por vez, curiosidade depois de cada resposta.
- *  A pontuação do ranking é calculada pelo servidor (POST /api/site/:slug/quiz, src/mods/quiz.js). */
+ *  A pontuação do ranking é calculada pelo servidor (POST /api/site/:slug/quiz, src/mods/quiz.js).
+ *  Cada pessoa joga UMA vez: o servidor confere o nome e o aparelho antes de começar (…/quiz/inicio) e de novo ao gravar. */
 function quiz(box, w) {
-  const Q = w.quiz, KEY = `quiz-nome:${w.slug}`;
+  const Q = w.quiz, KEY = `quiz-nome:${w.slug}`, DEV = "quiz-aparelho";
+  const devId = () => { try { return localStorage.getItem(DEV) || undefined; } catch { return undefined; } };
+  const keepDev = r => { try { if (r?.device) localStorage.setItem(DEV, r.device); } catch {} };
+  /** Já jogou: mostra a marca, a posição e o ranking (sem jogar de novo). */
+  const played = r => {
+    box.innerHTML = `<div class="qend qdone"><p class="label">Você já respondeu o quiz!</p><p class="qscore num">${r.score}<span>/${r.total}</span></p>
+      <h3 tabindex="-1">Sua pontuação: ${r.score} de ${r.total}</h3>
+      <p class="qplace" role="status"><b>${r.position}º lugar</b> no ranking${r.name ? ` · ${esc(r.name)}` : ""}</p>
+      <div class="qrank-box"><h3 class="qrank-t">Ranking dos amigos</h3>${prizeLine}${rankHtml(r.top, r.name)}</div>
+      <div class="qacts"><a class="btn" id="qWa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`Fiz ${r.score}/${r.total} no quiz de ${w.names} e fiquei em ${r.position}º lugar! E você, quanto conhece o casal? ${location.origin}${location.pathname}#quiz`)}">Desafiar no WhatsApp</a></div></div>`;
+  };
   const norm = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   let i = 0, score = 0, answers = [], started = 0, name = "";
   try { name = localStorage.getItem(KEY) || ""; } catch {}
   const band = n => n === Q.length ? ["Testemunha oficial dessa história!", "Você sabe tudo. Já pode contar essa história no brinde."]
     : n >= Q.length - 2 ? ["Quase da família!", (THEME_TEXT[w.theme] || {}).quizMid || "Conhece bem o casal. Na festa, puxa assunto sobre essa história."]
     : ["Vem com a gente na pista!", "Ainda dá tempo de conhecer melhor: senta perto deles e pede a história completa."];
+  // prêmio do 1º lugar (texto do casal; vazio = sem prêmio)
+  const prize = String(w.quiz_premio || "").trim();
+  const prizeCard = prize ? `<div class="qprize" role="note"><span class="qprize-i" aria-hidden="true">🏆</span><p><b>Prêmio</b>${esc(prize)}</p></div>` : "";
+  const prizeLine = prize ? `<p class="qprize-l"><span aria-hidden="true">🏆</span> ${esc(prize)}</p>` : "";
   const rankHtml = (top, me) => top.length
     ? `<ol class="qrank">${top.map((r, k) => { const mine = r.me ?? (me && norm(r.name) === norm(me));
         return `<li${mine ? ` class="me" aria-current="true"` : ""}><span class="qpos num">${k + 1}º</span><span class="qnm">${esc(r.name)}${mine ? ` <small>(você)</small>` : ""}</span><span class="qpts num">${r.score}/${r.total}</span></li>`; }).join("")}</ol>`
@@ -240,7 +257,9 @@ function quiz(box, w) {
 
   const start = () => {
     box.innerHTML = `<form class="qstart" novalidate>
+        ${prizeCard}
         <p class="qintro">São ${Q.length} perguntas. Acerte o máximo que puder e entre no ranking dos amigos.</p>
+        <p class="qonce"><b>Você só pode responder uma vez, capriche!</b></p>
         <div class="field"><label for="qName"><span>Seu nome</span></label>
           <input class="in" id="qName" name="name" minlength="2" maxlength="40" autocomplete="name" enterkeyhint="go" required value="${esc(name)}" aria-describedby="qNameHint qNameErr"></div>
         <p class="hint qhint" id="qNameHint">Seu nome aparece no ranking deste site.</p>
@@ -254,14 +273,20 @@ function quiz(box, w) {
       rk.textContent = open ? "Esconder ranking" : "Ver ranking";
       if (!open) return;
       rb.innerHTML = `<p class="muted">Carregando o ranking…</p>`;
-      try { const r = await api(`/api/site/${slug}/quiz/ranking`); rb.innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${rankHtml(r.top, name)}`; }
+      try { const r = await api(`/api/site/${slug}/quiz/ranking`); rb.innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${prizeLine}${rankHtml(r.top, name)}`; }
       catch (x) { rb.innerHTML = `<p class="error">${esc(x.message)}</p>`; }
     };
-    f.onsubmit = e => {
+    f.onsubmit = async e => {
       e.preventDefault();
-      const inp = $("#qName"), v = inp.value.trim().replace(/\s+/g, " ");
+      const inp = $("#qName"), v = inp.value.trim().replace(/\s+/g, " "), btn = f.querySelector("button[type=submit]");
       if (v.length < 2 || v.length > 40) { $("#qNameErr").textContent = "Escreva seu nome (de 2 a 40 letras) para entrar no ranking."; inp.setAttribute("aria-invalid", "true"); inp.focus(); return; }
       name = v; try { localStorage.setItem(KEY, v); } catch {}
+      // confere no servidor ANTES das perguntas: esse nome ou este aparelho já jogou?
+      btn.disabled = true; $("#qNameErr").textContent = "";
+      try {
+        const r = await api(`/api/site/${slug}/quiz/inicio`, { method: "POST", body: { name, device: devId() } }); keepDev(r);
+        if (r.played) return played(r);
+      } catch (x) { btn.disabled = false; $("#qNameErr").textContent = x.message; return; }
       i = 0; score = 0; answers = []; started = Date.now();
       draw(true);
     };
@@ -271,17 +296,17 @@ function quiz(box, w) {
     const [t, d] = band(score);
     box.innerHTML = `<div class="qend"><p class="qscore num">${score}<span>/${Q.length}</span></p><h3 tabindex="-1">${esc(t)}</h3><p>${esc(d)}</p>
       <p class="qplace" role="status">Você acertou ${score} de ${Q.length}. Calculando sua posição…</p><div class="qrank-box"></div>
-      <div class="qacts"><a class="btn" id="qWa" target="_blank" rel="noopener">Desafiar no WhatsApp</a><button class="btn ghost" type="button" id="qAgain">Jogar de novo</button></div></div>`;
+      <div class="qacts"><a class="btn" id="qWa" target="_blank" rel="noopener">Desafiar no WhatsApp</a></div></div>`;
     const wa = place => `https://wa.me/?text=${encodeURIComponent(`Fiz ${score}/${Q.length} no quiz de ${w.names}${place ? ` e fiquei em ${place}º lugar` : ""}! E você, quanto conhece o casal? ${location.origin}${location.pathname}#quiz`)}`;
     $("#qWa").href = wa(0);
-    $("#qAgain").onclick = start;
     box.querySelector("h3").focus({ preventScroll: true });
     try {
-      const r = await api(`/api/site/${slug}/quiz`, { method: "POST", body: { name, answers, seconds: Math.round((Date.now() - started) / 1000) } });
-      box.querySelector(".qplace").innerHTML = `Você acertou <b>${r.score} de ${r.total}</b> — <b>${r.position}º lugar</b>${r.improved ? "" : `<br><small>Sua melhor marca continua valendo: ${r.best.score} de ${r.best.total}.</small>`}`;
-      box.querySelector(".qrank-box").innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${rankHtml(r.top, name)}`;
+      const r = await api(`/api/site/${slug}/quiz`, { method: "POST", body: { name, answers, seconds: Math.round((Date.now() - started) / 1000), device: devId() } }); keepDev(r);
+      box.querySelector(".qplace").innerHTML = `Você acertou <b>${r.score} de ${r.total}</b> — <b>${r.position}º lugar</b>`;
+      box.querySelector(".qrank-box").innerHTML = `<h3 class="qrank-t">Ranking dos amigos</h3>${prizeLine}${rankHtml(r.top, name)}`;
       $("#qWa").href = wa(r.position);
     } catch (x) {
+      if (x.code === "ja_jogou" && x.data?.played) { keepDev(x.data); return played(x.data); } // jogou em outra aba: vale a primeira
       box.querySelector(".qplace").textContent = `Você acertou ${score} de ${Q.length}. Não deu para entrar no ranking agora: ${x.message}`;
     }
   };
@@ -305,5 +330,7 @@ function quiz(box, w) {
       f.querySelector("button").focus();
     });
   };
+  // ao abrir a página: se este aparelho já jogou, mostra o resultado direto (sem perguntas)
   start();
+  api(`/api/site/${slug}/quiz/inicio`, { method: "POST", body: { device: devId() } }).then(r => { keepDev(r); if (r.played && box.querySelector(".qstart")) played(r); }).catch(() => {});
 }

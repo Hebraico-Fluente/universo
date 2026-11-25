@@ -183,3 +183,7 @@ body>.petals{position:fixed;z-index:90}
 [data-theme="petalucas"] .gifts.photo .gtxt h3{font-size:clamp(20px,2vw,24px);line-height:1.05}
 [data-theme="petalucas"] .gifts.photo .v{font:700 18px/1.2 "Quicksand",sans-serif;color:var(--coral)}
 @media (max-width:520px){[data-theme="petalucas"] .gifts.photo .gtxt h3{font-size:18px}[data-theme="petalucas"] .gifts.photo .v{font-size:15px}}
+/* prêmio do quiz: coral suave com o verde da marca */
+[data-theme="petalucas"] .qprize{background:var(--coral-soft);border-color:color-mix(in srgb,var(--coral) 45%,transparent)}
+[data-theme="petalucas"] .qprize b{color:var(--accent)}
+[data-theme="petalucas"] .qprize-l{color:var(--accent)}

@@ -16,7 +16,7 @@ const SAVED_MSG = "Salvo. Pode levar até 1 minuto para aparecer no site.";
 
 /** Listas editáveis: campos de cada item (name, label, tipo, limite) e como aparece o título do item. */
 const LISTS = {
-  story: { label: "História", item: "Capítulo", add: "Adicionar capítulo", fields: [["year", "Ano ou data", "text", 12], ["title", "Título", "text", 80], ["text", "O que aconteceu", "area", 700], ["image", "Foto (opcional)", "image", 500]], blank: { year: "", title: "", text: "" } },
+  story: { label: "História", item: "Capítulo", add: "Adicionar capítulo", fields: [["year", "Ano ou data", "text", 12], ["title", "Título", "text", 80], ["text", "O que aconteceu", "area", 700], ["image", "Foto (opcional)", "image", 500], ["alt", "Descrição da foto ou do vídeo (para leitores de tela)", "text", 160], ["video", "", "keep"], ["poster", "", "keep"]], blank: { year: "", title: "", text: "" } },
   schedule: { label: "Cronograma", item: "Momento", add: "Adicionar momento", fields: [["time", "Horário", "text", 10], ["title", "Título", "text", 60], ["text", "Descrição curta", "text", 160], ["icon", "Ícone", "icon"]], blank: { time: "", title: "", text: "", icon: "clock" } },
   dress: { label: "Traje", item: "Orientação", add: "Adicionar orientação", fields: [["title", "Título", "text", 60], ["text", "Explicação", "area", 300], ["icon", "Ícone", "icon"]], blank: { title: "", text: "", icon: "shirt" } },
   faq: { label: "Dúvidas", item: "Pergunta", add: "Adicionar pergunta", fields: [["q", "Pergunta", "text", 160], ["a", "Resposta", "area", 600]], blank: { q: "", a: "" } },
@@ -195,6 +195,8 @@ function itemHtml(key, it, i, n) {
     if (type === "image") return imageField({ name: f, label, value: it[f] || "", lab });
     if (type === "money") return field({ name: f, label, value: reais(it.cents), lab, attrs: `inputmode="decimal" placeholder="R$ 0,00" data-money`, cls: "ed-money" });
     if (type === "options") return optionsHtml(it, pre);
+    // guardado sem campo visível (ex.: vídeo do capítulo, colocado pelo Gueta Studio): só volta igual no salvar
+    if (type === "keep") return it[f] ? `<input type="hidden" name="${f}" value="${esc(it[f])}">${f === "video" ? `<p class="small muted">Este capítulo tem um vídeo. Para trocar ou tirar, fale com o Gueta Studio.</p>` : ""}` : "";
     return field({ name: f, label, value: it[f] ?? "", max, lab, area: type === "area" });
   }).join("");
   return `<li class="ed-item" data-i="${i}"><fieldset><legend><span class="num">${String(i + 1).padStart(2, "0")}</span> ${esc(L.item)}${title ? `: <span class="ed-it">${esc(title)}</span>` : ""}</legend>
@@ -226,12 +228,13 @@ function giftsSec(v) {
 function quizSec(v) {
   return `<div class="ed-warn" role="note"><b>Usem só fatos verdadeiros do casal.</b> Os convidados vão jogar e compartilhar o resultado: nada de inventar histórias ou expor quem não pediu.</div>
     ${!D.features.quiz ? `<p class="muted small">O quiz não está incluído no plano de vocês.</p>` : ""}
+    ${field({ name: "quiz_premio", label: "Prêmio (opcional)", value: v.quiz_premio || "", max: 160, lab: "Prêmio do quiz", hint: "Aparece em destaque antes do quiz e em cima do ranking. Ex.: Quem ficar em 1º lugar ganha… Vazio: sem prêmio." })}
     ${listSec("quiz", v, "Cada pergunta tem 4 opções e uma certa. Depois da resposta, aparece a curiosidade.")}
     <div class="ed-sub ed-rank" aria-labelledby="edh-rank"><h3 id="edh-rank" tabindex="-1">Ranking dos amigos</h3>
-      <p class="muted small">Quem joga escreve o nome e entra no ranking do site (mais acertos; no empate, quem respondeu mais rápido). Vale a melhor tentativa de cada nome. Vocês podem apagar qualquer nome.</p>
+      <p class="muted small">Quem joga escreve o nome e entra no ranking do site (mais acertos; no empate, quem respondeu mais rápido). Cada pessoa responde uma vez (o site confere o nome e o aparelho).</p>
       <div id="edRank" aria-live="polite"><p class="muted small">Carregando o ranking…</p></div></div>`;
 }
-/** Ranking do quiz (src/mods/quiz.js): lista completa e "Apagar" (só noivos e assessoria). */
+/** Ranking do quiz (src/mods/quiz.js): lista completa e "Liberar nova tentativa" (só noivos e assessoria). */
 const dur = s => s < 60 ? s + " s" : Math.floor(s / 60) + " min " + (s % 60) + " s";
 async function loadRank() {
   const box = $("#edRank"); if (!box) return;
@@ -240,13 +243,13 @@ async function loadRank() {
     const { items } = await api("/api/admin/quiz");
     box.innerHTML = items.length ? `<ol class="ed-rl">${items.map(x => `<li><span class="num ed-rp">${x.position}º</span><span class="ed-rn"><b>${esc(x.name)}</b>
         <span class="muted small">${x.score} de ${x.total} · ${dur(x.seconds)}</span></span>
-        ${ro ? "" : `<button class="ed-ib danger" type="button" data-qdel="${esc(x.id)}" data-qname="${esc(x.name)}" aria-label="Apagar ${esc(x.name)} do ranking">Apagar</button>`}</li>`).join("")}</ol>
-        <p class="muted small">${items.length} ${items.length === 1 ? "pessoa jogou" : "pessoas jogaram"}. O site mostra as 10 primeiras.</p>`
+        ${ro ? "" : `<button class="ed-ib" type="button" data-qdel="${esc(x.id)}" data-qname="${esc(x.name)}" aria-label="Liberar nova tentativa para ${esc(x.name)}">Liberar nova tentativa</button>`}</li>`).join("")}</ol>
+        <p class="muted small">${items.length} ${items.length === 1 ? "pessoa jogou" : "pessoas jogaram"}. O site mostra as 10 primeiras. Cada pessoa responde uma vez (pelo nome e pelo aparelho); “Liberar nova tentativa” tira a jogada do ranking para a pessoa jogar de novo (ex.: nome digitado errado).</p>`
       : `<p class="muted small">Ninguém jogou ainda.</p>`;
   } catch (x) { box.innerHTML = `<p class="error">${esc(x.message)}</p>`; }
 }
 async function delRank(b) {
-  if (!confirm(`Apagar “${b.dataset.qname}” do ranking do quiz?`)) return;
+  if (!confirm(`Liberar nova tentativa para “${b.dataset.qname}”? A jogada sai do ranking e a pessoa pode responder de novo.`)) return;
   b.disabled = true;
   try { await api(`/api/admin/quiz/${encodeURIComponent(b.dataset.qdel)}`, { method: "DELETE" }); await loadRank(); $("#edh-rank")?.focus({ preventScroll: true }); }
   catch (x) { b.disabled = false; alert(x.message); }
@@ -311,7 +314,7 @@ function collect(sec, form) {
       }
     });
     if (sec === "story") items.forEach(it => { it.image = String(it.image || "").trim(); if (!it.image) delete it.image; });
-    return { errs, data: { [sec]: items } };
+    return { errs, data: sec === "quiz" ? { quiz: items, quiz_premio: g("quiz_premio").value } : { [sec]: items } };
   }
   if (sec === "gifts") {
     const items = readList("gifts");

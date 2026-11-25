@@ -40,7 +40,14 @@ export function sections({ data, esc }) {
     ${used.length > 1 ? `<div class="gl-filter rv" role="group" aria-label="Filtrar por momento"><button type="button" class="gl-chip" data-m="" aria-pressed="true">Todas <span class="num">${photos.length}</span></button>${used.map(m => `<button type="button" class="gl-chip" data-m="${esc(m.key)}" aria-pressed="false">${esc(m.label)}</button>`).join("")}</div>` : ""}
     <ul class="gl-grid" id="glGrid">${photos.map((p, i) => `<li class="gl-item" data-moment="${esc(p.moment)}"><button type="button" class="gl-open" data-i="${i}" aria-label="Ampliar: ${esc(photoAlt(g, p))}"><img src="${esc(p.url)}" alt="${esc(photoAlt(g, p))}" loading="lazy" decoding="async"></button></li>`).join("")}</ul>`
     : g.show ? `<p class="gl-empty muted rv">As primeiras fotos aparecem aqui assim que os noivos aprovarem.</p>` : "";
-  const form = g.uploads ? `
+  // pasta do Google Drive configurada pelo casal: no lugar do formulário, um botão que abre a pasta (nova aba)
+  const drive = g.uploads && /^https:\/\/drive\.google\.com\//.test(g.drive_folder || "") ? `
+    <div class="gl-send gl-drive rv">
+      <div class="gl-send-h"><h3>Mande as suas fotos</h3><p class="muted">Viu um momento bonito? Compartilhe com os noivos na pasta de fotos da festa.</p></div>
+      <a class="btn" href="${esc(g.drive_folder)}" target="_blank" rel="noopener">Enviar fotos no Google Drive <span aria-hidden="true">↗</span><span class="sr"> (abre em outra aba)</span></a>
+      <p class="muted small">Abre a pasta de fotos da festa. É preciso estar logado numa conta Google.</p>
+    </div>` : "";
+  const form = drive || (g.uploads ? `
     <form class="gl-send rv" id="glForm" novalidate>
       <div class="gl-send-h"><h3>Mande as suas fotos</h3><p class="muted">Viu um momento bonito? Compartilhe com os noivos. Até ${MAX_FILES} fotos por vez.</p></div>
       <label class="gl-drop"><input type="file" name="files" accept="image/jpeg,image/png,image/webp,image/*" multiple class="sr" id="glFiles"><span class="gl-drop-in"><b>Escolher fotos</b><span class="muted small" id="glPicked">Nenhuma foto escolhida</span></span></label>
@@ -49,7 +56,7 @@ export function sections({ data, esc }) {
       <p class="error" id="glErr" role="alert"></p>
       <p class="gl-status muted small" id="glStatus" role="status" aria-live="polite"></p>
       <button class="btn" type="submit">Enviar fotos</button>
-    </form>` : "";
+    </form>` : "");
   return [{
     id: "galeria", label: "Fotos", title: photos.length ? "Os nossos <em>momentos</em>" : "Fotos da <em>festa</em>", before: "duvidas",
     inner: `<div class="gl${form && photos.length ? " with-form" : ""}">${grid}${form}</div>

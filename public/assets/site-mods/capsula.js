@@ -1,6 +1,6 @@
 /**
  * Site: cápsula do tempo (módulo "midia"). O convidado escreve, junta (se quiser) uma foto ou um áudio curto
- * e escolhe quando abrir: 1º, 5º ou 10º aniversário. Ninguém lê antes da data — nem os noivos.
+ * e escolhe quando abrir: daqui a 6 meses ou daqui a 1 ano (contados do dia do casamento). Ninguém lê antes da data — nem os noivos.
  */
 import { compressImage } from "../upload.js";
 import { css, sendForm } from "./galeria.js";
@@ -20,13 +20,13 @@ function micAllowed() {
 export function sections({ data, esc }) {
   const c = data?.capsule;
   if (!c) return [];
-  const opts = [[1, "1º aniversário"], [5, "5º aniversário"], [10, "10º aniversário"]].map(([y, l]) => ({ y, l, d: c.opens[y], past: c.opens[y] <= c.today }));
-  const first = opts.find(o => !o.past)?.y;
+  const opts = (c.options || []).map(o => ({ m: o.months, l: `Daqui a ${o.label}`, d: o.opens, past: o.opens <= c.today }));
+  const first = opts.find(o => !o.past)?.m;
   return [{
     id: "capsula", label: "Cápsula do tempo", title: "Uma mensagem para <em>o futuro</em>", before: "duvidas", cls: "alt",
     inner: `<div class="cp">
       <div class="cp-about rv">
-        <p class="cp-lead">Escreva para os noivos de daqui a alguns anos. A mensagem fica <b>lacrada</b> e só se abre no aniversário de casamento que você escolher.</p>
+        <p class="cp-lead">Escreva para os noivos do futuro. A mensagem fica <b>lacrada</b> e só se abre na data que você escolher: 6 meses ou 1 ano depois do casamento.</p>
         <ul class="cp-points">
           <li><b>Ninguém lê antes da data</b>, nem os noivos: até lá, eles só sabem quantas cápsulas existem.</li>
           <li>Você pode juntar uma foto ou um áudio curto (até ${MAX_SECONDS / 60} minutos).</li>
@@ -35,14 +35,14 @@ export function sections({ data, esc }) {
         <details class="cp-policy"><summary>Como a cápsula é guardada</summary>
           <p>O conteúdo fica guardado neste site <b>enquanto a conta deste casamento existir</b>. Na data, a cápsula se abre só para os noivos, que podem ler, ouvir e exportar tudo para guardar por conta própria.</p>
           <p>O lacre é feito pelo sistema, não é criptografia: a equipe técnica que mantém o serviço tem acesso ao banco de dados, como em qualquer serviço online. Se a conta for encerrada antes da data, as cápsulas lacradas são apagadas junto.</p>
-          <p>Dez anos é muito tempo para qualquer serviço na internet. Se a mensagem for muito importante para você, guarde também uma cópia.</p>
+          <p>Se a mensagem for muito importante para você, guarde também uma cópia.</p>
         </details>
       </div>
       <form class="cp-form rv" id="cpForm" novalidate>
         <label class="field"><span>Seu nome</span><input class="in" name="author" maxlength="60" autocomplete="name" required></label>
         <label class="field"><span>Sua mensagem</span><textarea class="in" name="message" rows="6" maxlength="3000" placeholder="Como vocês estão? Lembram do que aconteceu na festa?" required></textarea></label>
         <fieldset class="cp-when"><legend class="field-l">Quando abrir</legend>
-          ${opts.map(o => `<label class="cp-opt${o.past ? " is-past" : ""}"><input type="radio" name="years" value="${o.y}"${o.y === first ? " checked" : ""}${o.past ? " disabled" : ""}><span><b>${esc(o.l)}</b><small>${esc(fmtDate(o.d))}</small></span></label>`).join("")}
+          ${opts.map(o => `<label class="cp-opt${o.past ? " is-past" : ""}"><input type="radio" name="months" value="${o.m}"${o.m === first ? " checked" : ""}${o.past ? " disabled" : ""}><span><b>${esc(o.l)}</b><small>${esc(fmtDate(o.d))}</small></span></label>`).join("")}
         </fieldset>
         <fieldset class="cp-att"><legend class="field-l">Anexo (opcional)</legend>
           <div class="cp-att-btns" role="group" aria-label="Tipo de anexo">
@@ -112,14 +112,14 @@ export function init({ data, slug, $, $$ }) {
     const err = $("#cpErr"), btn = f.querySelector("button[type=submit]"); err.textContent = "";
     if (f.author.value.trim().length < 2) { err.textContent = "Escreva seu nome."; f.author.focus(); return; }
     if (f.message.value.trim().length < 2) { err.textContent = "Escreva a mensagem."; f.message.focus(); return; }
-    const years = f.querySelector("input[name=years]:checked");
-    if (!years) { err.textContent = "Escolha quando a cápsula deve abrir."; return; }
+    const when = f.querySelector("input[name=months]:checked");
+    if (!when) { err.textContent = "Escolha quando a cápsula deve abrir."; return; }
     if (!f.consent.checked) { err.textContent = "Confirme que entendeu como a cápsula funciona."; f.consent.focus(); return; }
     if (rec && rec.state === "recording") stop();
     btn.disabled = true; btn.textContent = "Lacrando…";
     try {
       const fd = new FormData();
-      fd.append("author", f.author.value); fd.append("message", f.message.value); fd.append("years", years.value); fd.append("consent", "1");
+      fd.append("author", f.author.value); fd.append("message", f.message.value); fd.append("months", when.value); fd.append("consent", "1");
       let file = null;
       if (att === "foto" && f.photo.files[0]) file = await compressImage(f.photo.files[0], { maxSide: 1600, quality: 0.8 });
       if (att === "audio" && f.audio.files[0]) file = f.audio.files[0];

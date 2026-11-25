@@ -5,6 +5,7 @@
  * - Usa a API oficial de embed do Spotify (o player continua visível, como o Spotify exige).
  * - Quem não está logado no Spotify ouve o trecho de 30 s que o Spotify libera; no iPhone pode ser preciso tocar no play.
  * - "Silenciar" pausa e fica lembrado (localStorage): na próxima visita não toca sozinho; o botão toca de novo.
+ * - Um vídeo do site que começa a tocar com som pausa a música (sem lembrar).
  * Dados: w.music = { track (ID de 22 caracteres), label } vindo de /api/site/:slug (worker.publicWedding).
  */
 export const name = "musica";
@@ -56,6 +57,10 @@ export function init({ w, esc }) {
     else { setMuted(false); wantPlay = true; play(); }
     paint();
   });
+
+  // um vídeo do site tocando COM som (ex.: o pedido, na história ou no documentário) pausa a música; não fica lembrado
+  const quiet = e => { const v = e.target; if (v instanceof HTMLMediaElement && !v.paused && !v.muted && v.volume > 0 && playing) { try { ctrl?.pause(); } catch {} } };
+  document.addEventListener("play", quiet, true); document.addEventListener("volumechange", quiet, true);
 
   // API oficial do Spotify: cria o player compacto no canto
   window.onSpotifyIframeApiReady = IFrameAPI => {

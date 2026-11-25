@@ -320,7 +320,7 @@ function publicWedding(w) {
     rsvp_deadline: w.rsvp_deadline, is_demo: !!w.is_demo, slug: w.slug,
     theme: w.theme || "", venue_name: w.venue_name || "", schedule: parseJson(w.schedule_json, []), dress: parseJson(w.dress_json, []),
     map_image: w.map_image || "", gift_url: w.gift_url || "", rsvp_note: w.rsvp_note || "", guestbook: !!w.guestbook,
-    quiz: parseJson(w.quiz_json, []),
+    quiz: parseJson(w.quiz_json, []), quiz_premio: w.quiz_premio || "",
     music: spotifyTrackId(w.music_url) ? { track: spotifyTrackId(w.music_url), label: w.music_label || "" } : null };
 }
 
@@ -377,9 +377,14 @@ async function inviteRsvp(req, env, token) {
       .bind(str(g.diet, { max: 160, field: "Restrição alimentar" }), str(g.accessibility, { max: 160, field: "Acessibilidade" }), g.guest_id, h.id));
   }
   stmts.push(env.DB.prepare("UPDATE households SET note_to_couple = ?, responded_at = datetime('now') WHERE id = ?").bind(str(b.note, { max: 600, field: "Recado" }), h.id));
+  // ganchos dos módulos no mesmo envio (ex.: van): validam ANTES de gravar e gravam DEPOIS
+  const hooks = [];
+  for (const mod of MODS) if (mod.rsvp) { const f = await mod.rsvp(env, h, b, responses); if (f) hooks.push(f); }
   await batch(env, stmts);
   await audit(env, h.wedding_id, "guest:" + h.id, "rsvp", String(responses.length));
-  return json({ ok: true });
+  const extra = {};
+  for (const f of hooks) Object.assign(extra, await f());
+  return json({ ok: true, ...extra });
 }
 async function batch(env, stmts) { if (env.DB.batch) return env.DB.batch(stmts); for (const s of stmts) await s.run(); }
 

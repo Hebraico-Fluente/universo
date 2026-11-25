@@ -41,7 +41,7 @@ export function reveal(root = document) {
 export async function api(path, { method = "GET", body } = {}) {
   const r = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined, credentials: "same-origin" });
   let data = null; try { data = await r.json(); } catch {}
-  if (!r.ok) { const e = new Error(data?.error || "Algo deu errado. Tente de novo."); e.status = r.status; e.code = data?.code; throw e; }
+  if (!r.ok) { const e = new Error(data?.error || "Algo deu errado. Tente de novo."); e.status = r.status; e.code = data?.code; e.data = data; throw e; }
   return data;
 }
 

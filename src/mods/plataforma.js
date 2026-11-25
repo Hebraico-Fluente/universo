@@ -31,6 +31,7 @@
  *   featuresOf(env, W)       flags de um casamento pelo id
  *   gate(req, env, url)      domínio próprio (Host) e casamento suspenso — chamado no início de handle()
  *   logServerError(env, req, e)  grava o erro 500 sem dados pessoais
+ *   adminSession(req, env)   exige a sessão de administrador da plataforma
  */
 import { json, fail, str, int, oneOf, isoDate, body, randomToken, uid, sha256, hashPassword, safeEqual, rateLimit, clientIp, audit, parseJson } from "../lib.js";
 
@@ -39,6 +40,7 @@ export const FEATURES = [
   ["mesas", "Mapa de mesas"], ["fornecedores", "Fornecedores"], ["tarefas", "Tarefas"], ["presentes_pix", "Presentes com Pix"],
   ["mural", "Mural de recados"], ["quiz", "Quiz do casal"], ["galeria", "Galeria de fotos"], ["capsula", "Cápsula do tempo"],
   ["concierge", "Concierge"], ["copilot", "Copiloto"], ["padrinhos", "Área dos padrinhos"], ["quest", "Quest dos convidados"],
+  ["aniversario", "E-mails de aniversário (cápsula do tempo)"], ["van", "Lista da van"],
 ];
 const KEYS = FEATURES.map(f => f[0]);
 const flagsOf = w => {
@@ -154,7 +156,8 @@ export async function logServerError(env, req, e) {
 }
 
 /* ---------------- sessão do administrador ---------------- */
-async function adminSession(req, env) {
+/** Sessão do administrador da plataforma (401/403 se não for). Exportada para rotas de outros módulos (ex.: aniversario). */
+export async function adminSession(req, env) {
   const raw = readCookie(req, PCOOKIE) || readCookie(req, "plat");
   if (!raw || raw.length > 100) fail(401, "Entre como administrador da plataforma", "unauthenticated");
   const s = await env.DB.prepare(`SELECT ps.user_id, ps.expires_at, u.name, u.email, u.platform_role

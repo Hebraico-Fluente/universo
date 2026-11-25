@@ -17,7 +17,7 @@ import { featureOn } from "./plataforma.js";
 export const ICONS = ["rings", "music", "pizza", "glass", "sweet", "snack", "moon", "shirt", "shoe", "palette", "pin", "clock", "heart", "calendar", "cat", "ticket", "boat", "gift", "home"];
 const UNIVERSES = ["timeless", "editorial", "dreamscape"];
 export const HIDEABLE = ["story", "schedule", "dress", "faq", "gifts", "quiz"];
-const MAX = { story: 12, schedule: 16, dress: 8, faq: 20, gifts: 30, quiz: 12 };
+const MAX = { story: 12, schedule: 16, dress: 8, faq: 20, gifts: 30, quiz: 20 };
 const KEEP_VERSIONS = 60;
 
 /** campo do editor → seção e coluna(s) de weddings */
@@ -29,18 +29,25 @@ const FIELDS = {
   hero_image: ["images", "hero_image"], map_image: ["images", "map_image"],
   story: ["story", "story_json"], schedule: ["schedule", "schedule_json"], dress: ["dress", "dress_json"], faq: ["faq", "faq_json"],
   gifts: ["gifts", "gifts_json"], pix_key: ["gifts", "pix_key"], pix_name: ["gifts", "pix_name"], pix_city: ["gifts", "pix_city"], gift_url: ["gifts", "gift_url"],
-  quiz: ["quiz", "quiz_json"],
+  quiz: ["quiz", "quiz_json"], quiz_premio: ["quiz", "quiz_premio"],
   guestbook: ["visibility", "guestbook"], hidden: ["visibility", null],
 };
 const LISTS = new Set(["story", "schedule", "dress", "faq", "gifts", "quiz"]);
 /** colunas que somem do site quando a seção está escondida (e o valor "vazio" de cada uma) */
-const HIDE_COLS = { story: ["story"], schedule: ["schedule"], dress: ["dress"], faq: ["faq"], quiz: ["quiz"], gifts: ["gifts", "pix_key", "gift_url"] };
+const HIDE_COLS = { story: ["story"], schedule: ["schedule"], dress: ["dress"], faq: ["faq"], quiz: ["quiz", "quiz_premio"], gifts: ["gifts", "pix_key", "gift_url"] };
 const EMPTY = k => (LISTS.has(k) ? [] : "");
 const COLS = Object.entries(FIELDS).filter(([, [, c]]) => c).map(([k, [, c]]) => [k, c]);
 
 /* ---------------- validação ---------------- */
 const isObj = v => v && typeof v === "object" && !Array.isArray(v);
 /** Imagem: https (sem aspas/parênteses/espaços, vai para CSS url()) ou arquivo do próprio site (/m/... ou /assets/...). */
+/** Vídeo de um capítulo: só arquivo do próprio site (.mp4 em /assets ou /m). */
+export function videoUrl(v, field) {
+  v = str(v, { max: 300, field });
+  if (!v) return "";
+  if ((/^\/assets\/[A-Za-z0-9._~\/-]+\.mp4$/.test(v) || /^\/m\/f_[A-Za-z0-9_-]{8,20}$/.test(v)) && !v.includes("..") && !v.includes("//")) return v;
+  fail(400, `${field}: use um vídeo .mp4 do próprio site`, "invalid_url");
+}
 export function imageUrl(v, field) {
   v = str(v, { max: 500, field });
   if (!v) return "";
@@ -91,11 +98,15 @@ const V = {
   universe: v => oneOf(v, UNIVERSES, "Universo visual"),
   music_url: v => spotifyTrackUrl(v, "Música"),
   music_label: v => str(v, { max: 60, field: "Nome da música" }),
+  quiz_premio: v => str(v, { max: 160, field: "Prêmio do quiz" }),
   hero_image: v => imageUrl(v, "Foto de capa"),
   map_image: v => imageUrl(v, "Mapa ilustrado"),
   story: v => list(v, MAX.story, "História", (x, f) => {
     const o = { year: str(x.year, { max: 12, field: f + " · ano" }), title: str(x.title, { min: 1, max: 80, field: f + " · título" }), text: str(x.text, { max: 700, field: f + " · texto" }) };
-    const img = imageUrl(x.image, f + " · foto"); if (img) o.image = img; return o;
+    const img = imageUrl(x.image, f + " · foto"); if (img) o.image = img;
+    const video = videoUrl(x.video, f + " · vídeo"); if (video) { o.video = video; const poster = imageUrl(x.poster, f + " · capa do vídeo"); if (poster) o.poster = poster; }
+    if (img || video) { const alt = str(x.alt, { max: 160, field: f + " · descrição da foto" }); if (alt) o.alt = alt; }
+    return o;
   }),
   schedule: v => list(v, MAX.schedule, "Cronograma", (x, f) => ({ time: str(x.time, { min: 1, max: 10, field: f + " · horário" }), title: str(x.title, { min: 1, max: 60, field: f + " · título" }), text: str(x.text, { max: 160, field: f + " · texto" }), icon: icon(x.icon, f) || "clock" })),
   dress: v => list(v, MAX.dress, "Traje", (x, f) => ({ title: str(x.title, { min: 1, max: 60, field: f + " · título" }), text: str(x.text, { max: 300, field: f + " · texto" }), icon: icon(x.icon, f) || "shirt" })),

@@ -1,10 +1,11 @@
 /**
  * Abas do painel. Cada aba é um módulo com `export default async function()` que desenha em viewEl().
- * ready:false = ainda não aparece no menu (a tela está sendo construída).
+ * ready:false = ainda não aparece no menu (a tela está sendo construída). when(me) = só aparece quando devolver true.
  */
 export const VIEWS = [
   { id: "geral", label: "Visão geral", load: () => import("./geral.js") },
   { id: "convidados", label: "Convidados", load: () => import("./convidados.js") },
+  { id: "van", label: "Van", load: () => import("./van.js"), when: me => me.wedding.features?.van !== false },
   { id: "mesas", label: "Mesas", load: () => import("./mesas.js") },
   { id: "orcamento", label: "Orçamento", load: () => import("./orcamento.js") },
   { id: "fornecedores", label: "Fornecedores", load: () => import("./fornecedores.js") },

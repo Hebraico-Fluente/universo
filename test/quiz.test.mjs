@@ -40,17 +40,41 @@ r = await play("Ana Souza", wrong(2), 30, { extra: { score: 5, total: 5, acertos
 ok(r.status === 201 && r.body.score === 3 && r.body.total === 5 && r.body.position === 1, "servidor calcula 3 de 5 (ignora a pontuação enviada pelo cliente)");
 ok(db.prepare("SELECT score FROM quiz_scores WHERE name_norm = 'ana souza'").get().score === 3, "banco guarda a pontuação do servidor");
 
-/* ---------------- melhor tentativa por nome (normalizado) ---------------- */
-r = await play("  ANA   souza ", wrong(4), 10);
-ok(r.status === 201 && r.body.score === 1 && !r.body.improved && r.body.best.score === 3, "tentativa pior não substitui a melhor");
+/* ---------------- uma jogada por pessoa: nome (sem acento/maiúscula) ou aparelho ---------------- */
+r = await play("  ANA   souza ", wrong(0), 10);
+ok(r.status === 409 && r.body.code === "ja_jogou" && r.body.played && r.body.score === 3 && r.body.total === 5 && r.body.position === 1 && r.body.top.find(x => x.me)?.name === "Ana Souza", "mesmo nome (maiúsculas/espaços): 409 já jogou, com a marca e a posição");
 r = await play("Âna Sóuza", wrong(0), 50);
-ok(r.body.score === 5 && r.body.improved && r.body.best.score === 5, "tentativa melhor (mesmo nome sem acento) substitui");
-ok(db.prepare("SELECT COUNT(*) AS n FROM quiz_scores WHERE wedding_id = 'w_demo'").get().n === 1, "uma linha só por nome normalizado");
-ok(db.prepare("SELECT name FROM quiz_scores WHERE wedding_id = 'w_demo'").get().name === "Âna Sóuza", "nome exibido é o da melhor tentativa");
-r = await play("ana souza", wrong(0), 20);
-ok(r.body.improved && r.body.best.seconds === 20, "mesmos acertos em menos tempo substitui");
-r = await play("ana souza", wrong(0), 25);
-ok(!r.body.improved && r.body.best.seconds === 20, "mesmos acertos em mais tempo não substitui");
+ok(r.status === 409 && r.body.code === "ja_jogou", "mesmo nome com acentos: bloqueado");
+ok(db.prepare("SELECT COUNT(*) AS n FROM quiz_scores WHERE wedding_id = 'w_demo'").get().n === 1 && db.prepare("SELECT score, name FROM quiz_scores WHERE wedding_id = 'w_demo'").get().score === 3, "a primeira jogada vale (não melhora repetindo)");
+{
+  const dev = db.prepare("SELECT device_hash FROM quiz_scores WHERE wedding_id = 'w_demo'").get().device_hash;
+  ok(/^[A-Za-z0-9+/=]{40,}$/.test(dev || ""), "banco guarda só o hash do aparelho");
+  // mesmo aparelho (cookie), outro nome: bloqueado
+  const first = await t.call("POST", `/api/site/${SLUG}/quiz/inicio`, {}, { ck: "", ip: "10.1.5.1" });
+  const setc = first.headers.get("Set-Cookie") || "", fj = await first.json();
+  ok(first.status === 200 && fj.played === false && /^__Host-quizdev=[A-Za-z0-9_-]{16,64}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=\d+$/.test(setc) && fj.device === setc.split(";")[0].split("=")[1], "início: aparelho novo ganha um id (cookie HttpOnly/Secure + JSON para o localStorage)");
+  const ck = setc.split(";")[0];
+  r = await t.json("POST", `/api/site/${SLUG}/quiz`, { name: "Gabi", answers: RIGHT, seconds: 30 }, { ck, ip: "10.1.5.1" });
+  ok(r.status === 201 && r.body.score === 5, "aparelho joga a primeira vez");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz`, { name: "Outro Nome", answers: RIGHT, seconds: 30 }, { ck, ip: "10.1.5.1" });
+  ok(r.status === 409 && r.body.code === "ja_jogou" && r.body.name === "Gabi", "mesmo aparelho com outro nome: bloqueado");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz`, { name: "Outro Nome", answers: RIGHT, seconds: 30, device: fj.device }, { ck: "", ip: "10.1.5.2" });
+  ok(r.status === 409, "sem o cookie, o id guardado no navegador (localStorage) também segura");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz/inicio`, {}, { ck, ip: "10.1.5.1" });
+  ok(r.status === 200 && r.body.played && r.body.score === 5 && r.body.position >= 1 && Array.isArray(r.body.top), "ao abrir a página, o aparelho que já jogou recebe o resultado");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz/inicio`, { name: "gabi" }, { ck: "", ip: "10.1.5.3" });
+  ok(r.body.played && r.body.name === "Gabi", "antes de começar, o nome já usado é reconhecido (outro aparelho)");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz/inicio`, { name: "Pessoa Nova" }, { ck: "", ip: "10.1.5.3" });
+  ok(r.body.played === false, "nome novo em aparelho novo pode jogar");
+  ok((await t.json("POST", `/api/site/${SLUG}/quiz/inicio`, {}, { ck: "", origin: "https://golpe.com" })).status === 403, "início exige a mesma origem");
+  // painel: liberar nova tentativa (apaga a jogada; nome e aparelho voltam a poder jogar)
+  const gabi = db.prepare("SELECT id FROM quiz_scores WHERE wedding_id = 'w_demo' AND name = 'Gabi'").get().id;
+  ok((await t.json("DELETE", "/api/admin/quiz/" + gabi, null, { ck: demo })).status === 200, "painel libera nova tentativa");
+  ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'quiz.retry' AND target = ?").get(gabi).n === 1, "liberar nova tentativa vai para o registro de auditoria");
+  r = await t.json("POST", `/api/site/${SLUG}/quiz`, { name: "Gabi", answers: wrong(1), seconds: 31 }, { ck, ip: "10.1.5.1" });
+  ok(r.status === 201 && r.body.score === 4, "depois de liberada, a pessoa joga de novo (mesmo nome e aparelho)");
+  db.prepare("DELETE FROM quiz_scores WHERE name = 'Gabi'").run();
+}
 ok(normName("  Zé   da SILVA ") === "ze da silva", "normalização: sem acentos, minúsculo, espaços simples");
 
 /* ---------------- tempo limitado a 5 s – 1 h ---------------- */
@@ -61,9 +85,9 @@ ok(r.body.seconds === 3600, "tempo acima de 1 h vira 1 h");
 
 /* ---------------- desempate por tempo ---------------- */
 r = await play("Duda", wrong(0), 12);
-ok(r.body.position === 2, "mesmos acertos: quem foi mais rápido fica na frente (Bruno 5 s > Duda 12 s > Ana 20 s)");
+ok(r.body.position === 2, "mesmos acertos: quem foi mais rápido fica na frente (Bruno 5 s > Duda 12 s)");
 r = await ranking();
-ok(r.status === 200 && r.body.top.map(x => x.name).join() === "Bruno,Duda,ana souza,Carla", "ranking: mais acertos, depois menor tempo");
+ok(r.status === 200 && r.body.top.map(x => x.name).join() === "Bruno,Duda,Carla,Ana Souza", "ranking: mais acertos, depois menor tempo");
 ok(r.body.top.every(x => Object.keys(x).sort().join() === "name,score,total"), "ranking público mostra só nome, acertos e total");
 ok(r.res.headers.get("Cache-Control") === "no-store", "ranking não fica em cache");
 
@@ -72,7 +96,7 @@ for (let i = 0; i < 12; i++) await play(`Amigo ${String(i).padStart(2, "0")}`, w
 r = await play("Último Lugar", wrong(5), 3000, { ip: "10.1.2.1" });
 ok(r.body.position === 17 && r.body.count === 17 && r.body.top.length === TOP && !r.body.top.some(x => x.me), "fora do top 10: posição certa e o top tem 10");
 r = await play("Duda", wrong(0), 30, { ip: "10.1.2.2" });
-ok(r.body.top.filter(x => x.me).length === 1 && r.body.top.find(x => x.me).name === "Duda" && r.body.position === 2, "no top 10: o próprio nome vem marcado");
+ok(r.status === 409 && r.body.top.filter(x => x.me).length === 1 && r.body.top.find(x => x.me).name === "Duda" && r.body.position === 2, "quem já jogou vê a própria marca no top 10 (marcada)");
 ok((await ranking()).body.top.length === TOP, "GET ranking devolve só o top 10");
 
 /* ---------------- limite por IP ---------------- */
@@ -99,7 +123,7 @@ ok(r.status === 200 && r.body.items.length > TOP && r.body.items[0].name === "Br
 ok((await t.json("DELETE", "/api/admin/quiz/" + demoRow.id, null, { ck: demo, origin: "https://golpe.com" })).status === 403, "apagar exige a origem do painel");
 ok((await t.json("DELETE", "/api/admin/quiz/" + demoRow.id, null, { ck: demo })).status === 200, "casal apaga um nome");
 ok(!(await ranking()).body.top.some(x => x.name === "Bruno"), "nome apagado some do ranking público");
-ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE wedding_id = 'w_demo' AND action = 'quiz.delete' AND target = ?").get(demoRow.id).n === 1, "apagar fica na auditoria");
+ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE wedding_id = 'w_demo' AND action = 'quiz.retry' AND target = ?").get(demoRow.id).n === 1, "apagar fica na auditoria");
 ok((await t.json("DELETE", "/api/admin/quiz/" + demoRow.id, null, { ck: demo })).status === 404, "apagar de novo: 404");
 
 /* ---------------- LGPD: exportação e limpeza ---------------- */
@@ -115,21 +139,58 @@ ok(db.prepare("SELECT COUNT(*) AS n FROM quiz_scores WHERE wedding_id = 'w_lia'"
 await t.json("PATCH", "/api/admin/site", { hidden: ["quiz"] }, { ck: demo });
 ok((await ranking(SLUG, "10.3.0.1")).status === 404 && (await play("Zeca", RIGHT, 20, { ip: "10.3.0.2" })).status === 404, "quiz escondido: ranking e jogo fechados");
 
-/* ---------------- Pétala & Lucas: 9 perguntas (seed = migração 0075) ---------------- */
+/* ---------------- Pétala & Lucas: 18 perguntas (seed = migrações 0075 + 0080 + 0082 + 0084 + 0087 + 0089) ---------------- */
 const { PL_QUIZ } = await (async () => { const s = (await t.json("GET", "/api/site/petala-e-lucas")).body.wedding.quiz; return { PL_QUIZ: s }; })();
-ok(PL_QUIZ.length === 9 && PL_QUIZ[5].q === "Quais destes são os gatos do casal?" && PL_QUIZ[8].options[PL_QUIZ[8].answer] === "Estância Dom Raul, em Piraquara", "Pétala & Lucas: 5 perguntas originais + 4 novas");
 {
-  const mig = fs.readFileSync(new URL("../migrations/0075_petalucas_mais_perguntas_no_quiz.sql", import.meta.url), "utf8");
-  db.prepare("UPDATE weddings SET quiz_json = ? WHERE id = 'w_petalucas'").run(JSON.stringify(PL_QUIZ.slice(0, 5)));
-  db.exec(mig);
-  const after = JSON.parse(db.prepare("SELECT quiz_json FROM weddings WHERE id = 'w_petalucas'").get().quiz_json);
-  ok(JSON.stringify(after) === JSON.stringify(PL_QUIZ), "migração 0075 acrescenta as 4 perguntas iguais às do seed, sem mexer nas 5");
-  db.exec(mig);
-  ok(JSON.parse(db.prepare("SELECT quiz_json FROM weddings WHERE id = 'w_petalucas'").get().quiz_json).length === 9, "migração 0075 não duplica se rodar de novo");
-  const correct = { 5: "Antônio e Pólen", 6: "Caipirinha de limão sem açúcar", 7: "Tequila", 8: "Estância Dom Raul, em Piraquara" };
-  ok(Object.entries(correct).every(([i, v]) => after[i].options[after[i].answer] === v && after[i].options.length === 4), "respostas certas das 4 perguntas novas");
-  r = await play("Visitante", after.map(q => q.answer), 60, { slug: "petala-e-lucas", ip: "10.4.0.1" });
-  ok(r.status === 201 && r.body.score === 9 && r.body.total === 9, "Pétala & Lucas: 9 de 9 calculado no servidor");
+  const right = q => q.options[q.answer];
+  const by = text => PL_QUIZ.find(q => q.q === text);
+  ok(PL_QUIZ.length === 18 && !PL_QUIZ.some(q => q.q === "E qual é a bebida do noivo?" || q.q === "Quais destes são os gatos do casal?"), "Pétala & Lucas: 18 perguntas, sem a da bebida do noivo e sem a dos gatos");
+  ok(right(by("Qual é o drink da noiva?")) === "Caipirinha de limão sem açúcar", "a pergunta do drink da noiva continua");
+  ok(right(by("Como o Lucas entrou na mudança da Pétala, em 2019?")) === "Carregando caixas" && by("Como o Lucas entrou na mudança da Pétala, em 2019?").fact === "Carregando caixas! Desde então, não se desgrudaram.", "mudança de 2019 → “Carregando caixas”");
+  const novas = [
+    ["Qual o bicho favorito do Lucas?", "Coffee|Pólen|Felipe|Miguel", "Coffee"],
+    ["Qual o perfume que o Lucas vai usar no casamento?", "Jequiti Cebolinha|Grand Soir|Malbecão da Massa|Naxos", "Grand Soir"],
+    ["Qual a viagem favorita do casal?", "Lençóis Maranhenses|Afropunk Salvador|Carnaval Rio de Janeiro|Interior do Maranhão", "Interior do Maranhão"],
+    ["Qual a fruta favorita da Pétala?", "Limão|Jambo|Maracujá|Cupuaçu", "Jambo"],
+    ["Qual a série favorita do casal?", "Magnatas do Crime|As Quatro Estações|Machos Alpha|Attack on Titan", "Magnatas do Crime"],
+    ["Qual o lugar favorito do casal em Curitiba?", "Il Barbuto|Na Feira Bar|Casa Alaafia|Sociedade Treze de Maio", "Sociedade Treze de Maio"],
+    ["Qual o carro dos sonhos da Pétala?", "BYD Seal|Honda Civic Type R|Ferrari Testarossa|Kombi do Scooby-Doo", "Honda Civic Type R"],
+    ["Qual o anime favorito do Lucas?", "Naruto Shippuden|Attack on Titan|Jujutsu Kaisen|Demon Slayer", "Attack on Titan"],
+    ["Quantas plantas a Pétala tem?", "108|46|97|85", "46"],
+    ["Quantos perfumes o Lucas tem?", "55|42|38|61", "55"],
+    ["Qual o pet mais velho do casal?", "Coffee|Miguel|Antônio|Pólen", "Pólen"],
+  ];
+  ok(JSON.stringify(PL_QUIZ.slice(7).map(q => [q.q, q.options.join("|"), right(q)])) === JSON.stringify(novas), "as 11 perguntas novas, na ordem, com as opções e respostas do casal");
+}
+{
+  // reconstrói o quiz pelas migrações, como no banco de produção: 5 originais (0005) → 0075 → 0080 → 0082 → 0084
+  const mig = n => fs.readFileSync(new URL(`../migrations/${n}.sql`, import.meta.url), "utf8");
+  const get = () => JSON.parse(db.prepare("SELECT quiz_json FROM weddings WHERE id = 'w_petalucas'").get().quiz_json);
+  const ix = PL_QUIZ.findIndex(q => q.q === "Como o Lucas entrou na mudança da Pétala, em 2019?");
+  const orig5 = PL_QUIZ.slice(0, 5).map((q, i) => i === ix ? { ...q, answer: 0, fact: "Ele ofereceu seus serviços como arquiteto. Desde então, não se desgrudaram." } : q);
+  db.prepare("UPDATE weddings SET quiz_json = ? WHERE id = 'w_petalucas'").run(JSON.stringify(orig5));
+  db.exec(mig("0075_petalucas_mais_perguntas_no_quiz")); db.exec(mig("0075_petalucas_mais_perguntas_no_quiz"));
+  const a = get();
+  ok(a.length === 9 && a[7].q === "E qual é a bebida do noivo?" && a[7].options[a[7].answer] === "Tequila", "migração 0075 acrescenta as 4 perguntas (uma vez só)");
+  db.exec(mig("0080_petalucas_bicho_do_lucas_no_quiz")); db.exec(mig("0080_petalucas_bicho_do_lucas_no_quiz"));
+  ok(get().length === 16, "migração 0080 acrescenta 7 perguntas (uma vez só)");
+  db.exec(mig("0082_petalucas_resposta_da_mudanca")); db.exec(mig("0082_petalucas_resposta_da_mudanca"));
+  const before84 = get();
+  db.exec(mig("0084_petalucas_sem_bebida_do_noivo")); db.exec(mig("0084_petalucas_sem_bebida_do_noivo"));
+  const after84 = get();
+  db.exec(mig("0087_petalucas_mais_quatro_perguntas_no_quiz")); db.exec(mig("0087_petalucas_mais_quatro_perguntas_no_quiz"));
+  const before89 = get();
+  db.exec(mig("0089_petalucas_sem_pergunta_dos_gatos")); db.exec(mig("0089_petalucas_sem_pergunta_dos_gatos"));
+  const full = get();
+  ok(before89.length === 19 && JSON.stringify(full) === JSON.stringify(before89.filter(q => q.q !== "Quais destes são os gatos do casal?")), "0089 só tira a pergunta dos gatos (as outras idênticas e na mesma ordem)");
+  ok(JSON.stringify(full) === JSON.stringify(PL_QUIZ), "0082 corrige a mudança, 0084 tira a bebida do noivo e 0087 põe o anime, as plantas, os perfumes e o pet mais velho, 0089 tira os gatos: igual ao seed (idempotente)");
+  ok(JSON.stringify(after84) === JSON.stringify(before84.filter(q => q.q !== "E qual é a bebida do noivo?")), "0084 só tira aquela pergunta (as outras idênticas e na mesma ordem)");
+  r = await play("Visitante", full.map(q => q.answer), 60, { slug: "petala-e-lucas", ip: "10.4.0.1" });
+  ok(r.status === 201 && r.body.score === 18 && r.body.total === 18, "Pétala & Lucas: 18 de 18 calculado no servidor");
+  const coffee = full.findIndex(q => q.q === "Qual o bicho favorito do Lucas?");
+  r = await play("Visitante 2", full.map((q, i) => i === coffee ? 1 : q.answer), 70, { slug: "petala-e-lucas", ip: "10.4.0.2" });
+  ok(r.status === 201 && r.body.score === 17 && r.body.total === 18, "errar só a pergunta do Coffee: 17 de 18");
+  ok((await play("Visitante 3", full.map(q => q.answer).concat(0), 50, { slug: "petala-e-lucas", ip: "10.4.0.3" })).status === 409, "quiz antigo em cache (19 respostas) recebe “recarregue a página”");
 }
 
 /* ---------------- música do casal (music_url) ---------------- */

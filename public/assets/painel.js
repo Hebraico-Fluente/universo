@@ -92,7 +92,7 @@ async function shell() {
   const w = me.wedding;
   state.me = me;
   await applyTheme(w);
-  const tabs = VIEWS.filter(v => v.ready !== false);
+  const tabs = VIEWS.filter(v => v.ready !== false && (!v.when || v.when(me)));
   app.innerHTML = `
   <header class="bar"><div class="wrap">
     ${w.theme ? `<a class="brand logo" href="/c/${esc(w.slug)}" target="_blank" rel="noopener"><img src="/assets/themes/${esc(w.theme)}/logo.png" alt="${esc(w.names)}"></a>` : `<a class="brand" href="/">Universo</a>`}
@@ -109,7 +109,7 @@ async function shell() {
 }
 async function route() {
   view = location.hash.slice(1) || "geral";
-  const tabs = VIEWS.filter(v => v.ready !== false);
+  const tabs = VIEWS.filter(v => v.ready !== false && (!v.when || v.when(me)));
   const v = tabs.find(t => t.id === view) || tabs[0];
   $$(".tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.v === v.id ? "page" : "false"));
   viewEl().onclick = null;

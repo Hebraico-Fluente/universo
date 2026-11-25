@@ -34,6 +34,10 @@ export const QUEST = [
   ["conselho", "Conselho de quem sabe", "Peça a um casal com muitos anos juntos um conselho para os noivos."],
 ];
 
+/** Desafio que depende de outra seção do site: "recado" só existe com o mural de recados ligado. */
+export const questAvailable = (w, kind) => kind !== "recado" || !!w.guestbook;
+const questTemplates = w => QUEST.filter(([key]) => questAvailable(w, key)).map(([key, title, text]) => ({ key, title, text }));
+
 /* ---------------- convite: família pelo token (mesmas regras do convite) ---------------- */
 async function household(env, req, token, bucket = "exp-inv", max = LIMIT.concierge) {
   await rateLimit(env, bucket + ":" + clientIp(req), max);
@@ -193,7 +197,7 @@ async function admin(ctx) {
     const mine = parseJson(settings.flags_json, {}) || {};
     return json({ flags, items: ITEMS.map(i => ({ key: i.key, label: i.label, text: i.text, where: i.where, on: flags[i.key], couple: typeof mine[i.key] === "boolean" ? mine[i.key] : i.on, blocked: !!i.platform && !featureOn(w, i.platform) })),
       padrinhos: parseJson(settings.padrinhos_json, {}) || {}, soundtrack: parseJson(settings.soundtrack_json, {}) || {}, jornal: parseJson(settings.jornal_json, {}) || {},
-      slug: w.slug, has_story: (parseJson(w.story_json, []) || []).length, topics: TOPICS, kinds: KINDS, roles: ROLES, quest_templates: QUEST.map(([key, title, text]) => ({ key, title, text })) });
+      slug: w.slug, has_story: (parseJson(w.story_json, []) || []).length, topics: TOPICS, kinds: KINDS, roles: ROLES, quest_templates: questTemplates(w) });
   }
   if (sub === "/settings" && m === "PATCH") {
     const b = await body(req, 20000), patch = {};
@@ -332,14 +336,14 @@ async function admin(ctx) {
   /* quest */
   if (sub === "/quest" && m === "GET") {
     const ch = await all(env, `SELECT c.id, c.kind, c.title, c.text, (SELECT COUNT(*) FROM quest_done d WHERE d.challenge_id = c.id) AS done FROM quest_challenges c WHERE c.wedding_id = ? ORDER BY c.sort, c.rowid`, W);
-    return json({ challenges: ch, templates: QUEST.map(([key, title, text]) => ({ key, title, text })) });
+    return json({ challenges: ch.map(c => ({ ...c, off: !questAvailable(w, c.kind) })), templates: questTemplates(w) });
   }
   if (sub === "/quest" && m === "POST") {
     const b = await body(req, 4000);
     const n = (await first(env, "SELECT COUNT(*) AS n FROM quest_challenges WHERE wedding_id = ?", W)).n;
     if (n >= 20) fail(409, "Limite de 20 desafios", "too_many");
     let kind = "custom", title, text;
-    if (b.key) { const t = QUEST.find(q => q[0] === b.key) || fail(400, "Desafio inválido", "invalid"); [kind, title, text] = t;
+    if (b.key) { const t = QUEST.find(q => q[0] === b.key && questAvailable(w, q[0])) || fail(400, "Desafio inválido", "invalid"); [kind, title, text] = t;
       if (await first(env, "SELECT id FROM quest_challenges WHERE wedding_id = ? AND kind = ?", W, kind)) fail(409, "Esse desafio já está na lista", "exists"); }
     else { title = str(b.title, { min: 2, max: 80, field: "Desafio" }); text = str(b.text, { max: 240, field: "Descrição" }); }
     const id = uid("qc_");
@@ -469,9 +473,10 @@ export default {
     const out = { concierge: flags.concierge };
     if (flags.mensagens) out.secrets = await all(env, "SELECT id, title, body, media_url, media_type, opened_at IS NOT NULL AS opened FROM secret_messages WHERE wedding_id = ? AND household_id = ? AND (show_from IS NULL OR show_from <= ?) ORDER BY created_at", w.id, h.id, today);
     if (flags.quest) {
-      const ch = await all(env, "SELECT id, title, text FROM quest_challenges WHERE wedding_id = ? ORDER BY sort, rowid", w.id);
+      // "Deixe um carinho" aponta para o mural do site: sem mural (weddings.guestbook = 0), o desafio não aparece
+      const ch = (await all(env, "SELECT id, kind, title, text FROM quest_challenges WHERE wedding_id = ? ORDER BY sort, rowid", w.id)).filter(c => questAvailable(w, c.kind));
       const done = (await all(env, "SELECT challenge_id FROM quest_done WHERE household_id = ? AND wedding_id = ?", h.id, w.id)).map(d => d.challenge_id);
-      if (ch.length) out.quest = ch.map(c => ({ ...c, done: done.includes(c.id) }));
+      if (ch.length) out.quest = ch.map(({ kind, ...c }) => ({ ...c, done: done.includes(c.id) }));
     }
     if (flags.passaporte) {
       const evs = await all(env, `SELECT e.id, e.name, e.starts_at, e.venue, e.address, e.dress_code, c.at AS checked_at, c.by AS checked_by FROM invitations i JOIN events e ON e.id = i.event_id

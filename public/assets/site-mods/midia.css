@@ -104,7 +104,7 @@
 .mm-tl .num{color:var(--accent);font-weight:600}
 .mm-tl p{color:var(--ink-2);font-size:var(--t-small)}
 .mm-pl{display:grid;gap:12px;justify-items:start}
-.is-memories #presenca,.is-memories .hero-acts a[href="#presenca"],.is-memories .top nav a[href="#presenca"]{display:none}
+.is-memories #presenca,.is-memories .top nav a[href="#presenca"]{display:none}
 
 /* ---------- aniversário ---------- */
 .an{display:grid;gap:clamp(24px,3vw,36px)}

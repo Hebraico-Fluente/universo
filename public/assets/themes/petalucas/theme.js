@@ -1,6 +1,6 @@
 /**
  * Animações da identidade de Pétala & Lucas.
- * Corações no "Confirmar presença", linha do cronograma que se desenha (as pétalas caindo foram retiradas).
+ * Corações nos botões do topo e do mural, linha do cronograma que se desenha (as pétalas caindo foram retiradas).
  * Tudo desligado para quem prefere movimento reduzido.
  */
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -86,8 +86,8 @@ export function site() {
   djavan();
   if (reduce()) return;
 
-  // corações no botão principal
-  document.querySelectorAll(".hero-acts .btn.accent, .gb-form .btn").forEach(b => b.addEventListener("click", () => hearts(b)));
+  // corações nos botões do topo (o "Confirmar presença" saiu do topo; a seção #presenca continua mais abaixo)
+  document.querySelectorAll(".hero-acts a.btn, .gb-form .btn").forEach(b => b.addEventListener("click", () => hearts(b)));
 
   // linha do cronograma que se desenha conforme a rolagem
   const sch = document.querySelector(".schedule");

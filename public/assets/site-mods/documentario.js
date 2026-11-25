@@ -25,17 +25,19 @@ function open(w, sound, esc, opener) {
   const [a, b] = w.names.split("&").map(s => s.trim());
   const chapters = [
     { kind: "intro", k: "Um documentário de", title: `${esc(a)} <i>&amp;</i> ${esc(b)}`, text: `${w.story.length} capítulos até o “sim”.` },
-    ...w.story.map(s => ({ kind: "ch", k: s.year, title: esc(s.title), text: s.text, image: s.image })),
+    ...w.story.map(s => ({ kind: "ch", k: s.year, title: esc(s.title), text: s.text, image: s.image, video: s.video || "", poster: s.poster || "", alt: s.alt || "" })),
     { kind: "end", k: "Próximo capítulo", title: esc(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "numeric", month: "long", year: "numeric" }).format(new Date(w.date))), text: w.venue_name ? `${w.venue_name} · ${w.city}` : w.city },
   ];
   const dlg = document.createElement("dialog");
   dlg.className = "doc" + (reduce() ? " still" : "");
   dlg.setAttribute("aria-label", `A história de ${w.names} em modo documentário`);
   dlg.innerHTML = `
-    <div class="doc-stage">${chapters.map((c, i) => `<section class="doc-ch doc-${c.kind}" data-i="${i}" aria-hidden="true">
-      ${c.image ? `<div class="doc-img" data-bg="${esc(c.image)}"></div>` : `<div class="doc-img doc-noimg"></div>`}
-      <div class="doc-txt"><p class="doc-k">${esc(c.k)}</p><h2 class="doc-t">${c.title}</h2><p class="doc-p">${esc(c.text)}</p>
-      ${c.kind === "end" ? `<a class="btn accent doc-cta" href="#presenca">Confirmar presença</a>` : ""}</div></section>`).join("")}</div>
+    <div class="doc-stage">${chapters.map((c, i) => `<section class="doc-ch doc-${c.kind}${c.image || c.video ? " has-img" : ""}" data-i="${i}" aria-hidden="true">
+      ${c.video ? `<div class="doc-img doc-vid"><video muted playsinline loop preload="metadata" src="${esc(c.video)}"${c.poster ? ` poster="${esc(c.poster)}"` : ""}${c.alt ? ` aria-label="${esc(c.alt)}"` : ""}></video>
+          <div class="doc-vtools"><button class="doc-btn doc-vplay" type="button" hidden>▶ Assistir</button><button class="doc-btn doc-vsound" type="button" aria-pressed="false">🔇 Ativar som</button></div></div>`
+      : c.image ? `<div class="doc-img" data-bg="${esc(c.image)}"${c.alt ? ` role="img" aria-label="${esc(c.alt)}"` : ""}></div>` : `<div class="doc-img doc-noimg"></div>`}
+      <div class="doc-txt">${c.k ? `<p class="doc-k">${esc(c.k)}</p>` : ""}<h2 class="doc-t">${c.title}</h2>${c.text ? `<p class="doc-p">${esc(c.text)}</p>` : ""}
+      ${c.kind === "end" ? `<button class="doc-cta doc-back" type="button">Voltar ao site</button>` : ""}</div></section>`).join("")}</div>
     <div class="doc-top">
       <ol class="doc-prog" aria-hidden="true">${chapters.map(() => "<li><i></i></li>").join("")}</ol>
       <div class="doc-tools">
@@ -58,11 +60,26 @@ function open(w, sound, esc, opener) {
     secs.forEach((s, k) => { s.classList.toggle("on", k === i); s.classList.toggle("past", k < i); s.setAttribute("aria-hidden", k === i ? "false" : "true"); });
     bars.forEach((b, k) => b.classList.toggle("done", k <= i));
     dlg.querySelector(".doc-count").textContent = `${i + 1} de ${chapters.length}`;
+    // vídeo do capítulo: toca (sem som) só no capítulo ativo; com "reduzir movimento", espera o toque em "Assistir"
+    secs.forEach((s, k) => { const v = s.querySelector("video"); if (!v) return;
+      if (k !== i) { v.pause(); return; }
+      if (reduce()) s.querySelector(".doc-vplay").hidden = false; else v.play().catch(() => { s.querySelector(".doc-vplay").hidden = false; }); });
     dlg.querySelector(".doc-prev").disabled = i === 0;
     dlg.querySelector(".doc-next").disabled = i === chapters.length - 1;
   };
   const close = () => { audio?.pause(); dlg.close(); };
-  dlg.addEventListener("close", () => { audio?.pause(); dlg.remove(); document.documentElement.classList.remove("doc-lock"); opener.focus(); });
+  dlg.querySelectorAll(".doc-vid").forEach(box => {
+    const v = box.querySelector("video"), snd = box.querySelector(".doc-vsound"), pl = box.querySelector(".doc-vplay");
+    const paint = () => { const on = !v.muted; snd.setAttribute("aria-pressed", String(on)); snd.textContent = on ? "🔊 Som ligado" : "🔇 Ativar som"; };
+    snd.addEventListener("click", () => {
+      v.muted = !v.muted; paint();
+      if (!v.muted) { audio?.pause(); const sb = dlg.querySelector(".doc-sound"); if (sb) { sb.setAttribute("aria-pressed", "false"); sb.querySelector(".doc-sl").textContent = "Ligar trilha"; } v.play().catch(() => {}); }
+    });
+    pl.addEventListener("click", () => { pl.hidden = true; v.play().catch(() => { pl.hidden = false; }); });
+    v.addEventListener("playing", () => { pl.hidden = true; });
+    paint();
+  });
+  dlg.addEventListener("close", () => { dlg.querySelectorAll("video").forEach(v => v.pause()); audio?.pause(); dlg.remove(); document.documentElement.classList.remove("doc-lock"); opener.focus(); });
   dlg.querySelector(".doc-x").addEventListener("click", close);
   dlg.querySelector(".doc-prev").addEventListener("click", () => show(i - 1));
   dlg.querySelector(".doc-next").addEventListener("click", () => show(i + 1));

@@ -27,7 +27,7 @@ export async function localEnv({ seed = true } = {}) {
     prepare: stmt,
     async batch(list) { db.exec("BEGIN"); try { for (const s of list) s._run(); db.exec("COMMIT"); } catch (e) { db.exec("ROLLBACK"); throw e; } return []; },
   };
-  const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon", ".webmanifest": "application/manifest+json" };
+  const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon", ".mp4": "video/mp4", ".webmanifest": "application/manifest+json" };
   const ASSETS = {
     async fetch(req) {
       const u = new URL(req.url);
@@ -36,7 +36,17 @@ export async function localEnv({ seed = true } = {}) {
         const nf = path.join(ROOT, "public", "404.html");
         return new Response(fs.existsSync(nf) ? fs.readFileSync(nf) : "Não encontrado", { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
-      return new Response(fs.readFileSync(f), { headers: { "Content-Type": TYPES[path.extname(f)] || "application/octet-stream" } });
+      const type = TYPES[path.extname(f)] || "application/octet-stream", size = fs.statSync(f).size;
+      // como os arquivos estáticos da Cloudflare: aceita Range (o Safari só toca vídeo com 206)
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") || "");
+      if (m && (m[1] !== "" || m[2] !== "")) {
+        let start = m[1] === "" ? Math.max(0, size - Number(m[2])) : Number(m[1]);
+        let end = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+        if (start > end || start >= size) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+        const buf = fs.readFileSync(f).subarray(start, end + 1);
+        return new Response(buf, { status: 206, headers: { "Content-Type": type, "Content-Range": `bytes ${start}-${end}/${size}`, "Accept-Ranges": "bytes", "Content-Length": String(buf.length) } });
+      }
+      return new Response(fs.readFileSync(f), { headers: { "Content-Type": type, "Accept-Ranges": "bytes" } });
     },
   };
   return { DB, ASSETS, _db: db };

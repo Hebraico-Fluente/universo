@@ -1,0 +1,12 @@
+/* Painel · Van */
+.vn-set,.vn-list{margin-bottom:22px}
+.vn-form{display:grid;gap:14px;max-width:720px}
+.vn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px}
+.vn-more summary{cursor:pointer;font-weight:600}
+.vn-lh{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:6px}
+.vn-lh h2{margin:0}
+.vn-rows{list-style:none;margin:12px 0;padding:0;display:grid;gap:8px}
+.vn-row{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md,12px);background:var(--paper,#fff)}
+.vn-row.is-wait{opacity:.85}
+.vn-row .row-btns{display:flex;gap:12px}
+.vn-h3{font-size:var(--t-body,17px);margin:18px 0 0}

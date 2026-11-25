@@ -36,3 +36,12 @@
 [data-theme="petalucas"] .rsvpf .seg input:checked+span{background:var(--accent);color:#fff}
 [data-theme="petalucas"] .rsvpf .plus-add{background:var(--sage)}
 [data-theme="petalucas"] .rsvpf .in{border-radius:16px;background:#fff}
+
+/* van (módulo "van"): pergunta dentro do RSVP */
+.rsvpf .rf-van{display:grid;gap:12px;margin:0;padding:18px;border:1px solid var(--line);border-radius:var(--r-lg,16px)}
+.rsvpf .rf-van[hidden],.rsvpf .rf-van-sim[hidden]{display:none}
+.rsvpf .rf-van legend{font-weight:600;padding:0 6px}
+.rsvpf .rf-van-t,.rsvpf .rf-van p{margin:0}
+.rsvpf .rf-van-full{padding:10px 12px;border-radius:var(--r-md,12px);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.rsvpf .done-van{display:grid;gap:10px;justify-items:start;margin:8px 0}
+.rsvpf .done-van p{margin:0}

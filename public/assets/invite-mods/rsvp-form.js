@@ -2,6 +2,7 @@
  * Formulário de RSVP compartilhado: convite pessoal (/i/:token) e "Confirmar pelo nome" no site do casal.
  * Por pessoa e por evento, com prato (quando o evento tem cardápio), acompanhantes até o limite do convite,
  * restrição alimentar, acessibilidade e recado. Usa só os endpoints do convite (/api/invite/:token/...).
+ * Com a van ligada (mods.van, módulo "van"), quem confirma vê "Quer ir de van?" — vai no mesmo envio (campo `van`).
  *   mountRsvp(root, { token, data, onData })  → desenha em root; data = resposta de GET /api/invite/:token
  */
 import { $, $$, esc, longDate, api } from "../ui.js";
@@ -40,6 +41,20 @@ export function mountRsvp(root, { token, data, onData }) {
   }
   /** O prato só aparece para quem marcou "Vou". */
   const syncMenus = () => qq(".menu-pick").forEach(box => { box.hidden = !q(`[name="r_${box.dataset.g}_${box.dataset.e}"][value="yes"]`)?.checked; });
+  /** Quantas pessoas da família marcaram "Vou" em algum evento. */
+  const yesCount = () => data.guests.filter(g => qq(`input[name^="r_${CSS.escape(g.id)}_"][value="yes"]`).some(i => i.checked)).length;
+  /** Van: a pergunta só aparece com alguém confirmado; "Sim" abre quantas pessoas e WhatsApp. */
+  const syncVan = () => {
+    const box = q(".rf-van"); if (!box) return;
+    const n = yesCount(); box.hidden = n === 0;
+    const sim = q('[name="van_quer"][value="sim"]')?.checked;
+    q(".rf-van-sim").hidden = !sim;
+    // padrão = todos os confirmados; se a pessoa escolheu (ou já tinha resposta), mantém a escolha (até o número de confirmados)
+    const sel = q('[name="van_pessoas"]'), cur = sel.dataset.touched ? +sel.value || 0 : 0;
+    const pick = Math.max(1, cur ? Math.min(cur, n) : n);
+    sel.innerHTML = Array.from({ length: Math.max(1, n) }, (_, k) => `<option value="${k + 1}"${pick === k + 1 ? " selected" : ""}>${k + 1}</option>`).join("");
+  };
+  const fmtPhone = d => !d ? "" : d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d;
 
   function render(keepState = true) {
     const keep = keepState ? snapshot() : null;
@@ -71,20 +86,40 @@ export function mountRsvp(root, { token, data, onData }) {
           <div class="pa-row"><label class="sr" for="${uidp}pn">Nome do acompanhante</label><input class="in plus-name" id="${uidp}pn" maxlength="80" autocomplete="off" placeholder="Nome e sobrenome">
           <button class="btn ghost plus-btn" type="button">Adicionar acompanhante</button></div>
           <p class="error plus-err" role="alert"></p></div>` : ""}
+        ${vanHtml(dis)}
         <label class="field note"><span>Recado para os noivos <span class="muted">(opcional)</span></span><textarea class="in" name="note" rows="3" maxlength="600" ${dis}>${esc(h.note)}</textarea></label>
         <p class="priv">🔒 Seus dados servem só para organizar o casamento, ficam visíveis apenas para os noivos e são apagados ${purge ? `até ${esc(dmy(purge))}` : "depois da festa"}.</p>
         <p class="error rf-err" role="alert"></p>
         ${isOpen ? `<button class="btn accent rf-send" type="submit">${answered ? "Atualizar respostas" : "Enviar confirmação"}</button>` : ""}
       </form>
-      <div class="done" hidden tabindex="-1"><p class="label">Recebido</p><h2 class="done-t"></h2><p class="muted">Você pode voltar e mudar as respostas até o prazo (${esc(longDate(data.wedding.rsvp_deadline + "T12:00:00-03:00"))}).</p><button class="link rf-edit" type="button">Ver ou alterar respostas</button></div>`;
-    restore(keep); syncMenus();
+      <div class="done" hidden tabindex="-1"><p class="label">Recebido</p><h2 class="done-t"></h2><div class="done-van" hidden></div><p class="muted">Você pode voltar e mudar as respostas até o prazo (${esc(longDate(data.wedding.rsvp_deadline + "T12:00:00-03:00"))}).</p><button class="link rf-edit" type="button">Ver ou alterar respostas</button></div>`;
+    restore(keep); syncMenus(); syncVan();
     const f = q("form");
     f.addEventListener("submit", submit);
-    f.addEventListener("change", e => { if (e.target.type === "radio") syncMenus(); });
+    f.addEventListener("change", e => { if (e.target.type === "radio") { syncMenus(); syncVan(); } if (e.target.name === "van_pessoas") e.target.dataset.touched = "1"; });
     q(".rf-edit").addEventListener("click", () => { q(".done").hidden = true; f.hidden = false; f.querySelector("input,select,textarea")?.focus(); });
     q(".plus-btn")?.addEventListener("click", addPlus);
     q(".plus-name")?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addPlus(); } });
     qq(".rm-plus").forEach(b => b.addEventListener("click", () => removePlus(b.dataset.rm, b)));
+  }
+  function vanHtml(dis) {
+    const v = data.mods?.van; if (!v) return "";
+    const mine = v.mine;
+    return `<fieldset class="rf-van" hidden><legend>Quer ir de van para o casamento?</legend>
+      <p class="rf-van-t muted">${esc(v.texto)}</p>
+      ${[v.ponto && `Saída: ${v.ponto}`, v.saida && `Ida: ${v.saida}`, v.volta && `Volta: ${v.volta}`, v.valor_cents > 0 && `Valor por pessoa: ${(v.valor_cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`].filter(Boolean).map(x => `<p class="small">${esc(x)}</p>`).join("")}
+      ${v.esgotado && !mine ? `<p class="rf-van-full"><b>Vagas esgotadas</b>: se responder Sim, vocês entram na lista de espera.</p>` : ""}
+      <div class="seg" role="radiogroup" aria-label="Quer ir de van para o casamento?">
+        <label><input type="radio" name="van_quer" value="sim" ${mine ? "checked" : ""} ${dis}><span>Sim</span></label>
+        <label><input type="radio" name="van_quer" value="nao" ${dis}><span>Não</span></label>
+      </div>
+      <div class="rf-van-sim grid2" hidden>
+        <label class="field"><span>Quantas pessoas?</span><select class="in" name="van_pessoas"${mine ? ' data-touched="1"' : ""} ${dis}>${mine ? `<option value="${mine.pessoas}" selected>${mine.pessoas}</option>` : ""}</select></label>
+        <label class="field"><span>WhatsApp${v.exige_celular ? "" : " (opcional)"}</span><input class="in" name="van_celular" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="(41) 99999-9999" value="${esc(fmtPhone(mine?.celular || ""))}"${v.exige_celular ? " required" : ""} ${dis}></label>
+      </div>
+      ${mine?.espera ? `<p class="small">Vocês estão na <b>lista de espera</b> da van.</p>` : ""}
+      <p class="small muted">${v.exige_celular ? "O WhatsApp serve para os noivos colocarem vocês no grupo da van." : "Os noivos vão avisar os detalhes."}</p>
+    </fieldset>`;
   }
   async function reload() { data = await api(`/api/invite/${token}`); onData?.(data); }
 
@@ -127,13 +162,29 @@ export function mountRsvp(root, { token, data, onData }) {
     const missing = data.guests.length * data.events.length - responses.length;
     if (missing > 0) { err.textContent = `Falta responder ${missing} ${missing > 1 ? "itens" : "item"}. Marque “Vou” ou “Não vou” em cada evento.`; return; }
     if (noMenu) { err.textContent = "Falta escolher o prato de quem vai."; noMenu.focus(); return; }
+    // van (só com alguém confirmado e se a pergunta foi respondida)
+    let van;
+    const vbox = q(".rf-van");
+    if (vbox && !vbox.hidden) {
+      const quer = q('[name="van_quer"]:checked')?.value;
+      if (quer === "nao") van = { quer: false };
+      if (quer === "sim") {
+        const cel = f.van_celular;
+        if (cel.required && cel.value.replace(/\D/g, "").length < 10) { err.textContent = "Escreva o WhatsApp com DDD para a van."; cel.focus(); return; }
+        van = { quer: true, pessoas: +f.van_pessoas.value, celular: cel.value };
+      }
+    }
     const btn = q(".rf-send"); btn.disabled = true; btn.textContent = "Enviando…";
     try {
-      await api(`/api/invite/${token}/rsvp`, { method: "POST", body: { responses, details, note: f.note.value } });
+      const res = await api(`/api/invite/${token}/rsvp`, { method: "POST", body: { responses, details, note: f.note.value, ...(van ? { van } : {}) } });
       await reload();
       render(false);
       q("form").hidden = true; const done = q(".done"); done.hidden = false;
       q(".done-t").textContent = responses.some(r => r.status === "yes") ? "Que alegria! Está confirmado." : "Que pena. Obrigado por avisar.";
+      const vd = q(".done-van");
+      vd.innerHTML = res?.van?.quer ? (res.van.espera ? `<p>Van: vocês estão na <b>lista de espera</b>. Se abrir vaga, os noivos avisam.</p>`
+        : `<p>Van: anotado! ${res.van.grupo ? "" : "Os noivos vão avisar os detalhes."}</p>${res.van.grupo ? `<a class="btn accent" href="${esc(res.van.grupo)}" target="_blank" rel="noopener">Entrar no grupo da van <span aria-hidden="true">↗</span><span class="sr"> (abre o WhatsApp)</span></a>` : ""}`) : "";
+      vd.hidden = !res?.van?.quer;
       done.scrollIntoView({ block: "center" }); done.focus({ preventScroll: true });
     } catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = "Tentar de novo"; }
   }
