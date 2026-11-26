@@ -300,3 +300,7 @@
 .qprize p{margin:0;font-size:var(--t-small,15px);line-height:1.45}
 .qprize b{display:block;font:600 12px/1.2 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
 .qprize-l{margin:0 0 10px;font-size:var(--t-small,15px);color:var(--ink-2,var(--ink))}
+
+/* presente de valor livre (sem foto): mesmo cartão da lista, ícone no lugar da foto */
+.gifts.photo .gift-livre .gico{display:grid;place-items:center;aspect-ratio:1;width:100%;border-radius:inherit;background:var(--paper-2);color:var(--accent)}
+.gifts.photo .gift-livre .gico svg{width:34%;height:auto}

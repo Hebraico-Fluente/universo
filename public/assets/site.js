@@ -84,7 +84,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
       <ul class="gb-list" aria-live="polite">${messages.map(m => `<li class="gb-item rv"><p>${esc(m.message)}</p><span>${esc(m.author)}</span></li>`).join("") || `<li class="gb-empty muted">Seja a primeira pessoa a deixar um recado.</li>`}</ul></div>`));
 
   if (w.gifts.length || w.pix_key || w.gift_url) html.push(sec("presentes", "Presentes", "Sua presença é <em>o melhor presente</em>",
-    `${w.gifts.length ? `<ul class="gifts${w.gifts.some(g => g.image) ? " photo" : w.gifts.some(g => g.icon) ? " rich" : ""}">${w.gifts.map((g, i) => `<li class="gift rv">${g.image ? `<img class="gimg" src="${esc(g.image)}" alt="" loading="lazy" decoding="async" width="640" height="640">` : g.icon ? `<span class="gico">${icon(g.icon)}</span>` : ""}<div class="gtxt"><h3>${esc(g.title)}</h3>${g.note ? `<p>${esc(g.note)}</p>` : ""}</div><span class="v num">${g.cents ? esc(money(g.cents)) : "Valor livre"}</span>${w.pix_key ? `<button class="btn ghost sm" type="button" data-gift="${i}">Presentear</button>` : ""}</li>`).join("")}</ul>` : ""}
+    `${w.gifts.length ? `<ul class="gifts${w.gifts.some(g => g.image) ? " photo" : w.gifts.some(g => g.icon) ? " rich" : ""}">${w.gifts.map((g, i) => `<li class="gift rv">${g.image ? `<img class="gimg" src="${esc(g.image)}" alt="" loading="lazy" decoding="async" width="640" height="640">` : g.icon ? `<span class="gico">${icon(g.icon)}</span>` : ""}<div class="gtxt"><h3>${esc(g.title)}</h3>${g.note ? `<p>${esc(g.note)}</p>` : ""}</div><span class="v num">${g.cents ? esc(money(g.cents)) : "Valor livre"}</span>${w.pix_key ? `<button class="btn ghost sm" type="button" data-gift="${i}">Presentear</button>` : ""}</li>`).join("")}${w.pix_key && !w.gifts.some(g => !g.cents) ? `<li class="gift gift-livre rv"><span class="gico">${icon("heart")}</span><div class="gtxt"><h3>Presente de valor livre</h3><p>Você escolhe quanto quer dar${mods.cartao?.on ? ", no Pix ou no cartão" : ""}.</p></div><span class="v num">Valor livre</span><button class="btn ghost sm" type="button" data-gift="-1">Presentear</button></li>` : ""}</ul>` : ""}
      ${w.gift_url ? `<p class="rv"><a class="btn ghost" href="${esc(w.gift_url)}" target="_blank" rel="noopener">Ver lista de presentes</a></p>` : ""}
      ${w.pix_key ? `<div class="pix rv"><p><span class="label">Pix dos noivos</span> <code>${esc(w.pix_key)}</code></p><span class="pix-acts"><button class="btn sm" type="button" id="pixAny">QR Code</button><button class="btn ghost sm" type="button" id="copyPix">Copiar chave</button></span></div>` : ""}
      <p class="direct rv">O valor vai direto para a conta dos noivos, sem comissão de site de casamento.</p>`, "alt"));
@@ -203,7 +203,7 @@ function gifts(w) {
   const copy = async (btn, text, done) => { try { await navigator.clipboard.writeText(text); btn.textContent = done; } catch { btn.textContent = "Não deu para copiar. Use a chave abaixo."; } };
   const openGift = i => {
     gift = i; const g = w.gifts[i];
-    $("#pixT").textContent = g ? g.title : "Pix dos noivos";
+    $("#pixT").textContent = g ? g.title : "Presente de valor livre";
     $("#pixV").textContent = g?.cents ? money(g.cents) : "Valor livre";
     $("#pixAmtF").hidden = g?.cents > 0; amt.value = "";
     $("#pixCopy").textContent = "Copiar chave";
