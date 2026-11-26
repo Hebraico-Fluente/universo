@@ -79,9 +79,23 @@ export async function runCron(env, now = new Date()) {
   for (const mod of MODS) if (mod.cron) { try { await mod.cron(env, now); } catch (e) { console.error("cron", mod.name, e); } }
 }
 
+export function domainRedirect(env, host) {
+  host = String(host || "").toLowerCase();
+  for (const pair of String(env.DOMAIN_REDIRECTS || "").split(",")) {
+    const [from, to] = pair.split("=").map(x => (x || "").trim().toLowerCase());
+    if (from && to && from === host && to !== host) return to;
+  }
+  return null;
+}
+
 export async function handle(req, env) {
   let url = new URL(req.url);
   let p = url.pathname;
+  // endereços antigos/alternativos → domínio principal (301, mesmo caminho e consulta). DOMAIN_REDIRECTS = "de=para,de=para"
+  {
+    const to = domainRedirect(env, url.hostname);
+    if (to) return new Response(null, { status: 301, headers: { Location: "https://" + to + url.pathname + url.search, "Cache-Control": "public, max-age=3600" } });
+  }
   try {
     // plataforma: domínio próprio do casal (Host) e casamento suspenso — src/mods/plataforma.js
     const g = await platformGate(req, env, url);

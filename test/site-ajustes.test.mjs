@@ -179,4 +179,18 @@ ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE wedding_id = 'w_demo' A
   ok(sql.includes("og_image") && sql.includes("/assets/themes/petalucas/og.jpg"), "migração 0091 grava a imagem de P&L");
 }
 
+/* ---------- domínio antigo → petalaelucas.com.br ---------- */
+{
+  const { handle } = await import("../src/worker.js");
+  const wr = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  const DOMAIN_REDIRECTS = (wr.match(/"DOMAIN_REDIRECTS": "([^"]+)"/) || [])[1];
+  const e2 = { ...env, DOMAIN_REDIRECTS };
+  let r = await handle(new Request("https://petalaelucas.guetastudio.com.br/?v=1#x"), e2);
+  ok(r.status === 301 && r.headers.get("Location") === "https://petalaelucas.com.br/?v=1", "domínio antigo manda (301) para petalaelucas.com.br, com a consulta");
+  r = await handle(new Request("https://www.petalaelucas.com.br/api/site/x"), e2);
+  ok(r.status === 301 && r.headers.get("Location") === "https://petalaelucas.com.br/api/site/x", "www vai para o domínio sem www");
+  r = await handle(new Request("https://universo.test/c/petala-e-lucas"), e2);
+  ok(r.status === 200, "outros endereços não são redirecionados");
+}
+
 t.done("site-ajustes");
