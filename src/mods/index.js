@@ -12,6 +12,7 @@ import agenda from "./agenda.js";
 import quiz from "./quiz.js";
 import aniversario from "./aniversario.js";
 import van from "./van.js";
+import cartao from "./cartao.js";
 
 // aniversario antes de plataforma: a rota /api/platform/aniversarios é dele (plataforma responde 404 ao resto de /api/platform/*)
-export const MODS = [convidados, organizacao, aniversario, plataforma, editor, midia, experiencias, agenda, quiz, van];
+export const MODS = [convidados, organizacao, aniversario, plataforma, editor, midia, experiencias, agenda, quiz, van, cartao];

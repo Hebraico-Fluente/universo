@@ -220,7 +220,7 @@ async function api(req, env, url) {
       if (m === "POST" && r[2]) { await env.DB.prepare("UPDATE guestbook SET status = 'approved' WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); return json({ ok: true }); }
       if (m === "DELETE" && !r[2]) { await env.DB.prepare("DELETE FROM guestbook WHERE id = ? AND wedding_id = ?").bind(r[1], W).run(); await audit(env, W, actor, "guestbook.delete", r[1]); return json({ ok: true }); }
     }
-    if (p === "/api/admin/presentes" && m === "GET") return json({ gifts: (await env.DB.prepare("SELECT id, gift, cents, author, message, checked, created_at FROM gift_notices WHERE wedding_id = ? ORDER BY created_at DESC").bind(W).all()).results });
+    if (p === "/api/admin/presentes" && m === "GET") return json({ gifts: (await env.DB.prepare("SELECT id, gift, cents, author, message, checked, via, created_at FROM gift_notices WHERE wedding_id = ? ORDER BY created_at DESC").bind(W).all()).results });
     if ((r = p.match(/^\/api\/admin\/presentes\/([\w-]{2,40})(\/check)?$/))) {
       const own = await env.DB.prepare("SELECT id, checked FROM gift_notices WHERE id = ? AND wedding_id = ?").bind(r[1], W).first();
       if (!own) fail(404, "Aviso não encontrado", "not_found");

@@ -10,6 +10,7 @@
  * e esvazia a coluna em weddings — o site público (worker.publicWedding) só mostra o que está lá.
  * O endereço (slug) e o tema próprio NÃO são editáveis aqui.
  */
+import { cleanTag } from "./cartao.js";
 import { json, fail, str, int, oneOf, isoDate, body, audit, parseJson } from "../lib.js";
 import { featureOn } from "./plataforma.js";
 
@@ -28,13 +29,13 @@ const FIELDS = {
   music_url: ["music", "music_url"], music_label: ["music", "music_label"],
   hero_image: ["images", "hero_image"], map_image: ["images", "map_image"],
   story: ["story", "story_json"], schedule: ["schedule", "schedule_json"], dress: ["dress", "dress_json"], faq: ["faq", "faq_json"],
-  gifts: ["gifts", "gifts_json"], pix_key: ["gifts", "pix_key"], pix_name: ["gifts", "pix_name"], pix_city: ["gifts", "pix_city"], gift_url: ["gifts", "gift_url"],
+  gifts: ["gifts", "gifts_json"], pix_key: ["gifts", "pix_key"], pix_name: ["gifts", "pix_name"], pix_city: ["gifts", "pix_city"], gift_url: ["gifts", "gift_url"], infinitepay_tag: ["gifts", "infinitepay_tag"],
   quiz: ["quiz", "quiz_json"], quiz_premio: ["quiz", "quiz_premio"],
   guestbook: ["visibility", "guestbook"], hidden: ["visibility", null],
 };
 const LISTS = new Set(["story", "schedule", "dress", "faq", "gifts", "quiz"]);
 /** colunas que somem do site quando a seção está escondida (e o valor "vazio" de cada uma) */
-const HIDE_COLS = { story: ["story"], schedule: ["schedule"], dress: ["dress"], faq: ["faq"], quiz: ["quiz", "quiz_premio"], gifts: ["gifts", "pix_key", "gift_url"] };
+const HIDE_COLS = { story: ["story"], schedule: ["schedule"], dress: ["dress"], faq: ["faq"], quiz: ["quiz", "quiz_premio"], gifts: ["gifts", "pix_key", "gift_url", "infinitepay_tag"] };
 const EMPTY = k => (LISTS.has(k) ? [] : "");
 const COLS = Object.entries(FIELDS).filter(([, [, c]]) => c).map(([k, [, c]]) => [k, c]);
 
@@ -123,6 +124,7 @@ const V = {
   pix_name: v => str(v, { max: 25, field: "Nome do recebedor (Pix)" }),
   pix_city: v => str(v, { max: 15, field: "Cidade (Pix)" }),
   gift_url: v => httpsUrl(v, "Lista de presentes externa"),
+  infinitepay_tag: v => cleanTag(v),
   quiz: v => list(v, MAX.quiz, "Quiz", (x, f) => {
     if (!Array.isArray(x.options) || x.options.length !== 4) fail(400, `${f}: use exatamente 4 opções`, "invalid");
     const options = x.options.map((o, i) => str(o, { min: 1, max: 80, field: `${f} · opção ${i + 1}` }));

@@ -222,6 +222,7 @@ function giftsSec(v) {
         ${field({ name: "pix_key", label: "Chave Pix", value: v.pix_key, max: 77, lab: "Chave Pix", hint: "E-mail, celular, CPF ou chave aleatória. Sem a chave, os botões de Pix somem.", attrs: `autocomplete="off" spellcheck="false"${D.features.presentes_pix ? "" : " disabled"}` })}
         ${field({ name: "pix_name", label: "Nome do recebedor", value: v.pix_name, max: 25, lab: "Nome do recebedor (Pix)", hint: "Até 25 caracteres, como aparece no QR Code. O banco mostra o titular real da chave." })}
         ${field({ name: "pix_city", label: "Cidade do recebedor", value: v.pix_city, max: 15, lab: "Cidade (Pix)", hint: "Até 15 caracteres (exigência do padrão Pix)." })}
+        ${field({ name: "infinitepay_tag", label: "Cartão de crédito: InfiniteTag da InfinitePay (opcional)", value: v.infinitepay_tag, max: 41, lab: "InfiniteTag", hint: "O nome de usuário no app da InfinitePay, sem o $. Com ela, cada presente ganha “Pagar no cartão” (até 12x) e o dinheiro cai na conta dessa InfinitePay. O Pix continua igual.", attrs: `autocomplete="off" spellcheck="false" placeholder="ex.: petala-cavalcanti"` })}
         ${field({ name: "gift_url", label: "Lista de presentes externa (opcional)", value: v.gift_url, type: "url", max: 500, lab: "Lista de presentes externa", hint: "Link de uma loja, começando com https://", attrs: `inputmode="url" placeholder="https://"` })}
       </div></div>`;
 }
@@ -326,7 +327,7 @@ function collect(sec, form) {
     const key = g("pix_key").value.trim();
     if (/\s/.test(key)) need(g("pix_key"), "A chave não pode ter espaços.");
     if (!httpsOk(g("gift_url").value.trim())) need(g("gift_url"), "Use um link que comece com https://");
-    const data = { gifts: items, pix_name: g("pix_name").value, pix_city: g("pix_city").value, gift_url: g("gift_url").value.trim() };
+    const data = { gifts: items, pix_name: g("pix_name").value, pix_city: g("pix_city").value, gift_url: g("gift_url").value.trim(), infinitepay_tag: g("infinitepay_tag").value.trim().replace(/^\$/, "") };
     if (!g("pix_key").disabled) data.pix_key = key;
     return { errs, data };
   }

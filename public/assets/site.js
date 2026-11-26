@@ -127,6 +127,13 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
     <div class="qr" id="pixQr" role="img" aria-label="QR Code do Pix"></div>
     <p class="muted small how">No app do banco: <b>Pix › Ler QR Code</b>. Pelo celular, copie o código e use <b>Pix copia e cola</b>.</p>
     <button class="btn accent" type="button" id="pixCode">Copiar código Pix</button>
+    ${mods.cartao?.on ? `<form class="cardpay" id="cardPay" novalidate>
+      <p><b>Prefere cartão de crédito?</b> Pague em até 12x, com segurança, pela InfinitePay.</p>
+      <input class="in" name="author" maxlength="60" placeholder="Seu nome" autocomplete="name" aria-label="Seu nome (cartão)">
+      <textarea class="in" name="message" rows="2" maxlength="400" placeholder="Um recadinho junto com o presente (opcional)" aria-label="Recado (opcional, cartão)"></textarea>
+      <p class="error" id="cardErr" role="alert"></p>
+      <button class="btn" type="submit">Pagar no cartão</button>
+    </form>` : ""}
     <details class="keyalt"><summary>Prefere usar a chave?</summary><div class="pixkey"><code>${esc(w.pix_key)}</code><button class="btn sm" type="button" id="pixCopy">Copiar chave</button></div></details>
     <form class="gave" id="gave" novalidate>
       <p><b>Já fez o Pix?</b> Conte para os noivos que o presente é seu.</p>
@@ -137,6 +144,10 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
     </form>
     <p class="gave-ok" id="gaveOk" role="status" hidden><b>Obrigado pelo carinho!</b> Os noivos vão receber o seu aviso.</p>
     <p class="direct">O valor vai direto para a conta dos noivos, sem intermediário e sem comissão.</p>
+  </div></dialog>` : ""}
+  ${mods.cartao?.on ? `<dialog class="pixdlg" id="cardDlg" aria-labelledby="cardT"><div class="dlg-in">
+    <button class="x" type="button" id="cardX" aria-label="Fechar">×</button>
+    <p class="label">Presente no cartão</p><h3 id="cardT">Conferindo o pagamento…</h3><p class="muted" id="cardM" role="status"></p>
   </div></dialog>` : ""}
   ${w.is_demo ? `<p class="demo" role="note">Casamento fictício de demonstração · universo ${esc(universe)} · <a href="/">conheça o Universo</a></p>` : ""}`;
 
@@ -152,6 +163,7 @@ function render(w, events, messages, universe, loaded = [], mods = {}) {
     catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = "Enviar recado"; }
   });
   if (w.pix_key) gifts(w);
+  if (mods.cartao?.on) cardReturn();
   if (w.quiz.length) quiz($("#quizBox"), w);
 
   const onScroll = () => document.body.classList.toggle("scrolled", scrollY > innerHeight * .6);
@@ -204,6 +216,18 @@ function gifts(w) {
   $("#pixCopy").addEventListener("click", e => copy(e.target, w.pix_key, "Copiada!"));
   $("#pixCode").addEventListener("click", e => copy(e.target, code, "Código copiado! Cole no app do banco"));
   amt.addEventListener("input", draw);
+  const card = $("#cardPay");
+  card?.addEventListener("submit", async e => {
+    e.preventDefault(); const err = $("#cardErr"), btn = card.querySelector("button"); err.textContent = "";
+    if (card.author.value.trim().length < 2) { err.textContent = "Escreva seu nome para os noivos saberem quem presenteou."; card.author.focus(); return; }
+    const c = cents();
+    if (!(w.gifts[gift]?.cents > 0) && c < 100) { err.textContent = "Escreva quanto você quer presentear (mínimo R$ 1,00)."; amt.focus(); return; }
+    btn.disabled = true; btn.textContent = "Abrindo o pagamento…";
+    try {
+      const r = await api(`/api/site/${slug}/presentes/cartao`, { method: "POST", body: { gift: gift >= 0 ? gift : null, cents: c || null, author: card.author.value, message: card.message.value, back: location.pathname } });
+      location.href = r.url;
+    } catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = "Pagar no cartão"; }
+  });
   $("#pixX").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
   gave.addEventListener("submit", async e => {
@@ -216,6 +240,22 @@ function gifts(w) {
     } catch (x) { err.textContent = x.message; }
     btn.disabled = false; btn.textContent = "Já presenteei";
   });
+}
+/** Volta do checkout da InfinitePay: o servidor confere o pagamento na InfinitePay antes de avisar os noivos. */
+async function cardReturn() {
+  const q = new URLSearchParams(location.search), id = q.get("cartao");
+  if (!id || !/^pc_[0-9a-f]{24}$/.test(id)) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  const dlg = $("#cardDlg"); if (!dlg) return;
+  $("#cardX").addEventListener("click", () => dlg.close());
+  dlg.showModal();
+  const ask = () => api(`/api/site/${slug}/presentes/cartao/${id}/confirmar`, { method: "POST", body: { transaction_nsu: q.get("transaction_nsu") || "", slug: q.get("slug") || "" } });
+  try {
+    let r = await ask();
+    for (let i = 0; !r.paid && i < 4; i++) { await new Promise(ok => setTimeout(ok, 2500)); r = await ask(); }
+    if (r.paid) { $("#cardT").textContent = "Obrigado pelo presente!"; $("#cardM").textContent = `Pagamento de ${money(r.cents)} confirmado (${r.gift}). Os noivos já foram avisados.`; }
+    else { $("#cardT").textContent = "Pagamento ainda não confirmado"; $("#cardM").textContent = "Se você concluiu o pagamento, ele aparece para os noivos assim que a InfinitePay confirmar. Se desistiu, pode tentar de novo quando quiser."; }
+  } catch (x) { $("#cardT").textContent = "Não deu para conferir agora"; $("#cardM").textContent = x.message; }
 }
 /** "1.234,56", "50", "R$ 80,5" → centavos */
 function parseCents(v) {

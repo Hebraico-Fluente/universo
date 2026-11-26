@@ -252,6 +252,9 @@
 .gave{display:grid;gap:8px;margin-top:6px;padding-top:16px;border-top:1px solid var(--line)}
 .gave p{margin:0}
 .gave .error:empty{display:none}
+.cardpay{display:grid;gap:8px;margin-top:14px;padding-top:16px;border-top:1px solid var(--line)}
+.cardpay p{margin:0}
+.cardpay .error:empty{display:none}
 .gave-ok{margin:6px 0 0;padding:14px 16px;border-radius:var(--r-lg);background:var(--paper-2);text-align:center}
 .pix-acts{display:flex;gap:8px;flex-wrap:wrap}
 .pixdlg h3{font-size:var(--t-h3)}
