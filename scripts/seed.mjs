@@ -168,8 +168,10 @@ async function petalucas() {
     schedule_json: JSON.stringify([
       { time: "16h", title: "Cerimônia", text: "O “sim” mais esperado da galera.", icon: "rings" },
       { time: "17h", title: "Samba & soft drinks", text: "Recepção no ritmo para abrir a festa.", icon: "music" },
+      { time: "17h45", title: "Sorvete", text: "Uma pausa geladinha pra refrescar a tarde.", icon: "icecream" },
       { time: "18h", title: "Pizza", text: "Fatia quente, conversa boa.", icon: "pizza" },
       { time: "19h", title: "Drinks", text: "Brinde ao amor e ao pôr do sol.", icon: "glass" },
+      { time: "21h30", title: "Café", text: "Um cafezinho pra recarregar a energia.", icon: "coffee" },
       { time: "22h", title: "Docinhos", text: "A tradição que ninguém pula.", icon: "sweet" },
       { time: "00h", title: "Lanche da madrugada", text: "Combustível pra dançar até o fim.", icon: "snack" },
       { time: "01h45", title: "Fim da festa", text: "Mas o samba continua na memória.", icon: "moon" },

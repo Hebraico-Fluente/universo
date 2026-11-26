@@ -8,7 +8,7 @@ const UNIVERSES = [
   ["editorial", "Editorial", "Como uma revista: grade assimétrica, títulos grandes e linhas finas. Para casais urbanos e minimalistas."],
   ["dreamscape", "Sonho", "Cinematográfico: fundo de crepúsculo, fotos grandes e deriva suave. Para festas à noite, praia, destino."],
 ];
-const ICON_NAMES = { rings: "Alianças", music: "Música", pizza: "Pizza", glass: "Taça", sweet: "Doce", snack: "Lanche", moon: "Lua", shirt: "Camisa", shoe: "Sapato", palette: "Paleta", pin: "Local", clock: "Relógio", heart: "Coração" };
+const ICON_NAMES = { rings: "Alianças", music: "Música", pizza: "Pizza", glass: "Taça", sweet: "Doce", icecream: "Sorvete", coffee: "Café", snack: "Lanche", moon: "Lua", shirt: "Camisa", shoe: "Sapato", palette: "Paleta", pin: "Local", clock: "Relógio", heart: "Coração" };
 const SECTION_NAMES = { main: "Dados principais", look: "Aparência", images: "Fotos", music: "Música", story: "Nossa história", schedule: "Cronograma", dress: "Traje", faq: "Dúvidas", gifts: "Presentes e Pix", quiz: "Quiz", visibility: "Seções do site" };
 const HIDE_NAMES = { story: "Nossa história", schedule: "Cronograma do dia", dress: "Traje", faq: "Dúvidas", gifts: "Presentes e Pix", quiz: "Quiz do casal" };
 const ZONES = [["-03:00", "Brasília (−03:00)"], ["-02:00", "Fernando de Noronha (−02:00)"], ["-04:00", "Manaus, Cuiabá (−04:00)"], ["-05:00", "Acre (−05:00)"]];

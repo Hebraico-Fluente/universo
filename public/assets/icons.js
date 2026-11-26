@@ -6,6 +6,8 @@ const P = {
   glass: '<path d="M7 3h10l-1 6a4 4 0 01-8 0z"/><path d="M12 13v7M8.5 21h7"/>',
   sweet: '<circle cx="12" cy="12" r="4"/><path d="M8.5 10L4 7l1 5-1 5 4.5-3M15.5 10L20 7l-1 5 1 5-4.5-3"/>',
   snack: '<path d="M4 11h16a8 8 0 01-16 0z"/><path d="M4 11c0-3 3-5 8-5s8 2 8 5M9 6V4M15 6V4"/>',
+  icecream: '<path d="M8 11l4 10 4-10"/><path d="M7 11a5 5 0 0110 0z"/><path d="M9.5 6.5a2.5 2.5 0 015 0"/>',
+  coffee: '<path d="M4 9h13v5a5 5 0 01-5 5H9a5 5 0 01-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 010 5H17"/><path d="M8 3c-1 1.2 1 2 0 3.5M12 3c-1 1.2 1 2 0 3.5"/>',
   moon: '<path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/>',
   shirt: '<path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/>',
   shoe: '<path d="M3 17h18v2H3zM3 17c0-4 1-8 3-10l2 3c2 1 6 1 8 3s3 3 5 4"/>',

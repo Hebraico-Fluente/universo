@@ -14,7 +14,7 @@ import { json, fail, str, int, oneOf, isoDate, body, audit, parseJson } from "..
 import { featureOn } from "./plataforma.js";
 
 /** Mesma lista de public/assets/icons.js (o teste confere). */
-export const ICONS = ["rings", "music", "pizza", "glass", "sweet", "snack", "moon", "shirt", "shoe", "palette", "pin", "clock", "heart", "calendar", "cat", "ticket", "boat", "gift", "home"];
+export const ICONS = ["rings", "music", "pizza", "glass", "sweet", "snack", "icecream", "coffee", "moon", "shirt", "shoe", "palette", "pin", "clock", "heart", "calendar", "cat", "ticket", "boat", "gift", "home"];
 const UNIVERSES = ["timeless", "editorial", "dreamscape"];
 export const HIDEABLE = ["story", "schedule", "dress", "faq", "gifts", "quiz"];
 const MAX = { story: 12, schedule: 16, dress: 8, faq: 20, gifts: 30, quiz: 20 };

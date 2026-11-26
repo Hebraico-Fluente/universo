@@ -193,4 +193,19 @@ ok(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE wedding_id = 'w_demo' A
   ok(r.status === 200, "outros endereços não são redirecionados");
 }
 
+/* ---------- programação: sorvete 17h45 e café 21h30 ---------- */
+{
+  const sched = () => JSON.parse(db.prepare("SELECT schedule_json FROM weddings WHERE slug = 'petala-e-lucas'").get().schedule_json);
+  ok(sched().some(i => i.time === "17h45" && i.title === "Sorvete") && sched().some(i => i.time === "21h30" && i.title === "Café"), "seed: sorvete e café na programação");
+  const sem = sched().filter(i => !["Sorvete", "Café"].includes(i.title));
+  db.prepare("UPDATE weddings SET schedule_json = ? WHERE slug = 'petala-e-lucas'").run(JSON.stringify(sem));
+  db.exec(read("migrations/0092_petalucas_sorvete_e_cafe.sql"));
+  const after = sched();
+  ok(after.length === 9 && after.map(i => i.time).join(",") === "16h,17h,17h45,18h,19h,21h30,22h,00h,01h45", "migração 0092: 9 itens, na ordem dos horários");
+  ok(after.find(i => i.title === "Sorvete").icon === "icecream" && after.find(i => i.title === "Café").icon === "coffee", "ícones de sorvete e café");
+  db.exec(read("migrations/0092_petalucas_sorvete_e_cafe.sql"));
+  ok(sched().length === 9, "migração 0092 não duplica");
+  ok(read("public/assets/icons.js").includes("icecream:") && read("public/assets/icons.js").includes("coffee:"), "ícones desenhados");
+}
+
 t.done("site-ajustes");
