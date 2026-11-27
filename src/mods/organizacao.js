@@ -580,7 +580,7 @@ export async function commandCenter(env, W, base, mods = {}) {
       "Guardem o link do contrato assinado aqui: valores, horários e multas ficam fáceis de conferir na reta final.", "#fornecedores", "Anexar contrato");
   }
   if (base.diets > 0) add(`diet:${base.diets}`, "baixo", `${base.diets} ${base.diets > 1 ? "pessoas informaram" : "pessoa informou"} restrição alimentar`,
-    "Passem a lista ao buffet antes de fechar o cardápio, para cada pessoa ter o que comer.", "#convidados", "Ver restrições");
+    "Passem a lista ao buffet antes de fechar o cardápio, para cada pessoa ter o que comer.", "#restricoes", "Ver restrições");
   const seats = seatsFrom(mods.convidados);
   if (seats) {
     const confirmed = Number(mods.convidados.confirmed ?? mods.convidados.seating?.confirmed) || Math.max(0, ...(base.events || []).map(e => e.yes || 0));

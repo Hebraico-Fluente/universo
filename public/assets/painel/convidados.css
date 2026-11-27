@@ -16,7 +16,7 @@
 .waitl{margin-top:40px}
 .waitl h2{font-size:var(--t-h3)}
 .remind,.menus,.buffet{margin-bottom:26px}
-.remind[hidden],.menus[hidden],.buffet[hidden]{display:none}
+.remind[hidden],.menus[hidden]{display:none}
 .rm-warn{padding:12px 14px;border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);max-width:70ch}
 .rm-list li{display:grid;gap:8px;padding:16px 0;border-bottom:1px solid var(--line)}
 .rm-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}

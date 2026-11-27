@@ -18,7 +18,7 @@ export default async function overview() {
     if (pendingHH) alerts.push(`${pendingHH} ${pendingHH > 1 ? "famílias ainda não responderam" : "família ainda não respondeu"}. <a href="#convidados">Ver quem falta</a>`);
     if (o.gifts?.unchecked) alerts.push(`${o.gifts.unchecked} ${o.gifts.unchecked > 1 ? "presentes avisados por Pix ainda não foram conferidos" : "presente avisado por Pix ainda não foi conferido"} no extrato. <a href="#presentes">Ver presentes</a>`);
     if (b.to_pay > 0) alerts.push(`Faltam ${money(b.to_pay)} a pagar em contratos fechados. <a href="#orcamento">Ver vencimentos</a>`);
-    if (!c && o.diets) alerts.push(`${o.diets} ${o.diets > 1 ? "pessoas informaram" : "pessoa informou"} restrição alimentar. Lembre de passar ao buffet.`);
+    if (!c && o.diets) alerts.push(`${o.diets} ${o.diets > 1 ? "pessoas informaram" : "pessoa informou"} restrição alimentar. <a href="#restricoes">Ver lista para o buffet</a>`);
     // alertas simples publicados por outros módulos ({ text, href })
     for (const [name, m] of Object.entries(o.mods || {})) if (name !== "organizacao" && Array.isArray(m?.alerts)) for (const a of m.alerts.slice(0, 4)) if (a?.text) alerts.push(`${esc(a.text)}${a.href && /^#[\w-]+$/.test(a.href) ? ` <a href="${esc(a.href)}">Abrir</a>` : ""}`);
 

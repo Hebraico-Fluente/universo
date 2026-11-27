@@ -5,6 +5,7 @@
 export const VIEWS = [
   { id: "geral", label: "Visão geral", load: () => import("./geral.js") },
   { id: "convidados", label: "Convidados", load: () => import("./convidados.js") },
+  { id: "restricoes", label: "Restrições", load: () => import("./restricoes.js") },
   { id: "van", label: "Van", load: () => import("./van.js"), when: me => me.wedding.features?.van !== false },
   { id: "mesas", label: "Mesas", load: () => import("./mesas.js") },
   { id: "orcamento", label: "Orçamento", load: () => import("./orcamento.js") },
