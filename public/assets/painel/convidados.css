@@ -15,8 +15,8 @@
 .wl-all li>span:first-child::before{content:counter(wl) ". ";color:var(--muted);font-variant-numeric:tabular-nums}
 .waitl{margin-top:40px}
 .waitl h2{font-size:var(--t-h3)}
-.remind,.menus{margin-bottom:26px}
-.remind[hidden],.menus[hidden]{display:none}
+.remind,.menus,.buffet{margin-bottom:26px}
+.remind[hidden],.menus[hidden],.buffet[hidden]{display:none}
 .rm-warn{padding:12px 14px;border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);max-width:70ch}
 .rm-list li{display:grid;gap:8px;padding:16px 0;border-bottom:1px solid var(--line)}
 .rm-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
@@ -44,3 +44,7 @@
 [data-theme="petalucas"] .gsum b,[data-theme="petalucas"] .rm-h b{font-family:"Quicksand",sans-serif;font-weight:700}
 [data-theme="petalucas"] .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
 [data-theme="petalucas"] .mn-ev h3{font-family:"TrashHand",cursive;color:var(--accent);font-size:26px}
+
+.bf-t{width:100%;border-collapse:collapse;margin:12px 0}
+.bf-t th,.bf-t td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.bf-t th{font:600 12px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}

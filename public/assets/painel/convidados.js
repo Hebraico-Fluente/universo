@@ -23,12 +23,27 @@ export default async function guests(flash) {
     const sug = x.waitlist;
     const hhById = Object.fromEntries(d.households.map(h => [h.id, h]));
     const hasMenus = ev => x.menus.some(m => m.event_id === ev);
+    // lista para o buffet: quem confirmou presença (sim em algum evento) e escreveu restrição alimentar
+    const going = g => Object.values(g.responses || {}).includes("yes");
+    const buffet = active.flatMap(h => h.guests.filter(g => g.diet && going(g)).map(g => ({ name: g.name, diet: g.diet, child: g.is_child, invite: h.name })));
+    // escreveu restrição e ainda tem evento sem resposta (quem recusou tudo não conta)
+    const buffetPending = active.flatMap(h => h.guests.filter(g => g.diet && !going(g) && h.events.some(e => (g.responses || {})[e] !== "no"))).length;
 
     viewEl().innerHTML = `
       <header class="vh"><div><p class="label">Convidados</p><h1>${people} pessoas em ${active.length} convites</h1></div>
         ${ro ? "" : `<div class="row-btns"><button class="btn" type="button" id="add">Nova família convidada</button>
           <button class="btn ghost" type="button" id="remind" aria-expanded="false" aria-controls="remindP">Lembrar quem não respondeu${remindable.length ? ` (${remindable.length})` : ""}</button>
-          <button class="btn ghost" type="button" id="menuB" aria-expanded="false" aria-controls="menuP">Cardápio</button></div>`}</header>
+          <button class="btn ghost" type="button" id="menuB" aria-expanded="false" aria-controls="menuP">Cardápio</button></div>`}
+        <div class="row-btns"><button class="btn ghost" type="button" id="buffetB" aria-expanded="false" aria-controls="buffetP">Lista para o buffet${buffet.length ? ` (${buffet.length})` : ""}</button></div></header>
+
+      <section class="panel buffet" id="buffetP" hidden aria-labelledby="bf-t"><h2 id="bf-t">Lista para o buffet</h2>
+        ${buffet.length ? `<p class="muted small">${buffet.length} ${buffet.length === 1 ? "pessoa confirmou presença e informou" : "pessoas confirmaram presença e informaram"} restrição alimentar.${buffetPending ? ` Mais ${buffetPending} ${buffetPending === 1 ? "pessoa escreveu" : "pessoas escreveram"} restrição mas ainda não ${buffetPending === 1 ? "confirmou" : "confirmaram"} presença (não entram aqui).` : ""}</p>
+        <table class="bf-t"><thead><tr><th scope="col">Nome</th><th scope="col">Restrição alimentar</th></tr></thead>
+          <tbody>${buffet.map(b => `<tr><td>${esc(b.name)}${b.child ? ` <span class="muted small">criança</span>` : ""}</td><td>${esc(b.diet)}</td></tr>`).join("")}</tbody></table>
+        <div class="row-btns"><button class="btn sm" type="button" id="bfCopy">Copiar lista</button><button class="btn ghost sm" type="button" id="bfCsv">Baixar planilha (CSV)</button></div>`
+        : `<p class="muted">Ninguém que confirmou presença informou restrição alimentar até agora.${buffetPending ? ` (${buffetPending} ${buffetPending === 1 ? "pessoa escreveu" : "pessoas escreveram"} restrição mas ainda não confirmou presença.)` : ""}</p>`}
+        <p class="muted small">A restrição é o que o convidado escreveu ao confirmar presença no convite.</p>
+      </section>
 
       <ul class="gsum" aria-label="Resumo">
         <li><b class="num">${active.length - pending.length}</b> convites respondidos</li>
@@ -107,6 +122,16 @@ export default async function guests(flash) {
       <p class="muted small">Por segurança, o link de cada convite aparece só quando é gerado. Se perder o link, gere um novo: o anterior para de funcionar.</p>`;
 
     if (flash) flash();
+    $("#buffetB").onclick = () => { const p = $("#buffetP"); p.hidden = !p.hidden; $("#buffetB").setAttribute("aria-expanded", String(!p.hidden)); if (!p.hidden) p.scrollIntoView({ block: "start", behavior: "smooth" }); };
+    $("#bfCopy")?.addEventListener("click", async e => {
+      const t = `Restrições alimentares · ${state.me?.wedding?.names || "casamento"}\n` + buffet.map(b => `• ${b.name}${b.child ? " (criança)" : ""}: ${b.diet}`).join("\n");
+      try { await navigator.clipboard.writeText(t); e.target.textContent = "Lista copiada!"; } catch { e.target.textContent = "Não deu para copiar"; }
+    });
+    $("#bfCsv")?.addEventListener("click", () => {
+      const q = v => `"${String(v).replace(/"/g, '""')}"`;
+      const csv = "\ufeff" + ["Nome;Restrição alimentar;Criança;Convite", ...buffet.map(b => [b.name, b.diet, b.child ? "sim" : "", b.invite].map(q).join(";"))].join("\r\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = "restricoes-alimentares.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
     if (ro) return bindFilter();
 
     const peopleEl = $("#people");
