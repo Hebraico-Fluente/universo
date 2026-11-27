@@ -89,7 +89,7 @@ async function quizOf(env, slug) {
   if (!w || !Array.isArray(quiz) || !quiz.length || !featureOn(w, "quiz")) fail(404, "Quiz não encontrado", "not_found");
   return { W: w.id, quiz };
 }
-const topOf = async (env, W) => (await env.DB.prepare(`SELECT id, name, score, total FROM quiz_scores WHERE wedding_id = ? ORDER BY ${ORDER} LIMIT ?`).bind(W, TOP).all()).results;
+const topOf = async (env, W) => (await env.DB.prepare(`SELECT id, name, score, total, seconds FROM quiz_scores WHERE wedding_id = ? ORDER BY ${ORDER} LIMIT ?`).bind(W, TOP).all()).results;
 const countOf = async (env, W) => (await env.DB.prepare("SELECT COUNT(*) AS n FROM quiz_scores WHERE wedding_id = ?").bind(W).first()).n;
 
 async function play(ctx, slug) {
